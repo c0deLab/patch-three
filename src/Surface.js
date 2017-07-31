@@ -14,6 +14,19 @@ const boundaryMaterial = new THREE.LineBasicMaterial({
 const interiorMaterial = boundaryMaterial.clone();
 interiorMaterial.linewidth = 1;
 
+const controlMaterial = new THREE.LineDashedMaterial({
+  color: 0xffffff,
+  linewidth: 1,
+  dashSize: 0.015,
+  gapSize: 0.015,
+});
+
+const controlPtMaterial = new THREE.MeshBasicMaterial({
+  color: 0xffffff,
+  opacity: 0.5,
+  transparent: true
+});
+
 /*
  *	Returns a curve object to be added to a scene.
  */
@@ -41,8 +54,6 @@ class Surface {
      * Default Surface: square from 0-1, control points evenly spaced
      */
 
-    const d = 50;
-
     const u0 = Curve(p(0, 0), p(0.333, 0), p(0.667, 0), p(1, 0));
     const u1 = Curve(p(0, 1), p(0.333, 1), p(0.667, 1), p(1, 1));
     const v0 = Curve(p(0, 0), p(0, 0.333), p(0, 0.667), p(0, 1));
@@ -53,6 +64,28 @@ class Surface {
     this.v0 = v0;
     this.v1 = v1;
 
+    this.controls = false;
+
+  }
+
+  toggleControls() {
+    this.controls = !this.controls;
+    this.update();
+  }
+
+  addControl(v, size) {
+    const d = 0.006 * size;
+    const controlPtGeo = new THREE.SphereGeometry(d, 8, 8); // BoxGeometry(d, d, d);
+    const controlPt = new THREE.Mesh(controlPtGeo, controlPtMaterial);
+    controlPt.position.set(v.x, v.y, v.z);
+    this.scene.add(controlPt);
+  }
+
+  addControlLine(v1, v2) {
+    const lineGeo = new THREE.Geometry();
+    lineGeo.vertices.push(v1, v2);
+    lineGeo.computeLineDistances();
+    this.scene.add(new THREE.Line(lineGeo, controlMaterial));
   }
 
   setScene(scene) { this.scene = scene; }
@@ -60,7 +93,14 @@ class Surface {
   update() {
 
   	// tear down all existing scene objects
-    this.scene.children = [];
+    const children = this.scene.children;
+    // clean up
+    while (children.length > 0) {
+      const child = children.pop();
+      this.scene.remove(child);
+      child.geometry.dispose();
+      child.material.dispose();
+    }
 
   	// add interior curves
   	const step = 0.04;
@@ -88,6 +128,36 @@ class Surface {
   		this.scene.add(new THREE.Line(u_crv, material));
       this.scene.add(new THREE.Line(v_crv, material));
   	}
+
+    if (this.controls) {
+
+      this.addControl(this.v0.__bez.v0, 3);
+      this.addControl(this.v0.__bez.v1, 2);
+      this.addControl(this.v0.__bez.v2, 2);
+      this.addControl(this.v0.__bez.v3, 3);
+
+      this.addControl(this.v1.__bez.v0, 3);
+      this.addControl(this.v1.__bez.v1, 2);
+      this.addControl(this.v1.__bez.v2, 2);
+      this.addControl(this.v1.__bez.v3, 3);
+
+      this.addControl(this.u0.__bez.v1, 2);
+      this.addControl(this.u0.__bez.v2, 2);
+      this.addControl(this.u1.__bez.v1, 2);
+      this.addControl(this.u1.__bez.v2, 2);
+
+      this.addControlLine(this.v0.__bez.v0, this.v0.__bez.v1);
+      this.addControlLine(this.v0.__bez.v0, this.u0.__bez.v1);
+
+      this.addControlLine(this.v0.__bez.v3, this.v0.__bez.v2);
+      this.addControlLine(this.v0.__bez.v3, this.u1.__bez.v1);
+
+      this.addControlLine(this.v1.__bez.v0, this.v1.__bez.v1);
+      this.addControlLine(this.v1.__bez.v0, this.u0.__bez.v2);
+
+      this.addControlLine(this.v1.__bez.v3, this.v1.__bez.v2);
+      this.addControlLine(this.v1.__bez.v3, this.u1.__bez.v2);
+    }
   }
 
   /**
@@ -171,6 +241,31 @@ class Surface {
         if (k === "v0" && pt === "v3") targetPt = this.u1.__bez.v0;
         if (k === "v1" && pt === "v0") targetPt = this.u0.__bez.v3;
         if (k === "v1" && pt === "v3") targetPt = this.u1.__bez.v3;
+
+        srfPt.__dx = targetPt.x - srfPt.x;
+        srfPt.__dy = targetPt.y - srfPt.y;
+        srfPt.__dz = targetPt.z - srfPt.z;
+      });
+    });
+
+    // now that we have the target surface, step toward it
+    this.step(0, duration, cb);
+  }
+
+  restore(duration, cb) {
+
+    let s = new Surface();
+
+    ["u0", "u1", "v0", "v1"].forEach((k) => {
+
+      let b = this[k].__bez; // boundary curve
+
+      ["v0", "v1", "v2", "v3"].forEach((pt) => {
+
+        // for legibility, this is the point on the target surface
+        // corresponding to the current boundary curve's control point
+        let srfPt = b[pt];
+        let targetPt = s[k].__bez[pt];
 
         srfPt.__dx = targetPt.x - srfPt.x;
         srfPt.__dy = targetPt.y - srfPt.y;

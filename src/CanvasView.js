@@ -11,7 +11,7 @@ export default class CanvasView extends Component {
 
 		super();
 
-		this.keys = { LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40 };
+		this.keys = { LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, SPACE: 32, ESC: 27 };
 		this.keysDown = [];
 
 		this.onResize = _.debounce(this.onResize.bind(this), 250);
@@ -21,6 +21,8 @@ export default class CanvasView extends Component {
 		this.onKeyUp = this.onKeyUp.bind(this);
 		this.draw = this.draw.bind(this);
 		this.rotateSurface = this.rotateSurface.bind(this);
+		this.toggleSurfaceControls = this.toggleSurfaceControls.bind(this);
+		this.restoreSurface = this.restoreSurface.bind(this);
 	}
 
 	onResize() {
@@ -42,18 +44,26 @@ export default class CanvasView extends Component {
 
 	onKeyDown(e) {
 
+		const code = e.keyCode;
+
 		Object.values(this.keys).forEach((key) => {
-			if (e.keyCode === key) this.keysDown.push(e.keyCode);
+			if (code === key) this.keysDown.push(code);
 		});
 		
 		// remove duplicates
 		this.keysDown = _.uniq(this.keysDown);
 
-		if (!this.isRotating) this.rotateSurface();
+		// rotating
+		if (!this.isRotating && code >= 37 && code <= 40) this.rotateSurface();
+
+		// others
+		if (_.indexOf(this.keysDown, this.keys.SPACE) >= 0) this.toggleSurfaceControls();
+		if (_.indexOf(this.keysDown, this.keys.ESC) >= 0) this.restoreSurface();
 	}
 
 	onKeyUp(e) {
-		this.keysDown = this.keysDown.filter(key => key !== e.keyCode);
+		const code = e.keyCode;
+		this.keysDown = this.keysDown.filter(key => key !== code);
 	}
 
 	onMouseWheel(e) {
@@ -105,6 +115,15 @@ export default class CanvasView extends Component {
 		} else {
 			this.isRotating = false;
 		}
+	}
+
+	toggleSurfaceControls() {
+		this.surface.toggleControls();
+		this.draw();
+	}
+
+	restoreSurface() {
+		this.surface.restore(60, this.draw);
 	}
 
 	componentDidMount() {
