@@ -1,31 +1,14 @@
 import easing from './utils/easing';
+import { 
+  p,
+  boundaryMaterial,
+  interiorMaterial,
+  controlMaterial,
+  controlPtMaterial,
+  activeControlPointMaterial
+} from './utils/surface-helpers';
 
 const THREE = require('three');
-
-// helper for new vec3
-const p = (x, y, z = 0.5) => new THREE.Vector3(x - 0.5, y - 0.5, z - 0.5);
-
-const boundaryMaterial = new THREE.LineBasicMaterial({ 
-	color : 0xffffff,
-	linewidth: 3,
-	linecap: 'round'
-});
-
-const interiorMaterial = boundaryMaterial.clone();
-interiorMaterial.linewidth = 1;
-
-const controlMaterial = new THREE.LineDashedMaterial({
-  color: 0xffffff,
-  linewidth: 1,
-  dashSize: 0.015,
-  gapSize: 0.015,
-});
-
-const controlPtMaterial = new THREE.MeshBasicMaterial({
-  color: 0xffffff,
-  opacity: 0.5,
-  transparent: true
-});
 
 /*
  *	Returns a curve object to be added to a scene.
@@ -64,8 +47,62 @@ class Surface {
     this.v0 = v0;
     this.v1 = v1;
 
+    this.controlPointsList = [
+      ["v0", "v0", 3],
+      ["v0", "v1", 2],
+      ["v0", "v2", 2],
+      ["v0", "v3", 3],
+      ["u1", "v1", 2],
+      ["u1", "v2", 2],
+      ["v1", "v3", 3],
+      ["v1", "v2", 2],
+      ["v1", "v1", 2],
+      ["v1", "v0", 3],
+      ["u0", "v2", 2],
+      ["u0", "v1", 2]
+    ];
+
+    this.activeControlPoint = -1;
+    this.lastActiveControlPoint = -1;
+
     this.controls = false;
 
+  }
+
+  activateControls() {
+    // if there was a last active control point, use that
+    this.activeControlPoint = this.lastActiveControlPoint >= 0 ? this.lastActiveControlPoint : 0;
+    this.controls = true;
+    this.update();
+  }
+
+  deactivateControls() {
+    this.controls = false;
+    this.deactivateControlPoint();
+  }
+
+  setActiveControlPoint(i) {
+    const l = this.controlPointsList.length;
+    this.activeControlPoint = (this.activeControlPoint + i + l) % l;
+    this.update();
+  }
+
+  deactivateControlPoint() {
+    this.lastActiveControlPoint = this.activeControlPoint;
+    this.activeControlPoint = -1;
+    this.update();
+  }
+
+  controlPointFromIndex(i) {
+    const pt = this.controlPointsList[i];
+    const crv = this[pt[0]];
+    const v = crv.__bez[pt[1]];
+    return v;
+  }
+
+  getActiveControlPoint() {
+    if (this.activeControlPoint === -1) return null;
+    return this.controlPointFromIndex(this.activeControlPoint);
   }
 
   toggleControls() {
@@ -73,10 +110,22 @@ class Surface {
     this.update();
   }
 
-  addControl(v, size) {
+  addControlPt(pt) {
+
+    const isActive = this.controlPointsList.indexOf(pt) === this.activeControlPoint;
+
+    // pt an array from this.controlPointsList,
+    // index 0 = curve name
+    // index 1 = vertex name
+    // index 2 = size of sphere
+    const crv = this[pt[0]];
+    const v = crv.__bez[pt[1]];
+    const size = isActive ? 6 : pt[2];
+
     const d = 0.006 * size;
+
     const controlPtGeo = new THREE.SphereGeometry(d, 8, 8); // BoxGeometry(d, d, d);
-    const controlPt = new THREE.Mesh(controlPtGeo, controlPtMaterial);
+    const controlPt = new THREE.Mesh(controlPtGeo, isActive ? activeControlPointMaterial : controlPtMaterial);
     controlPt.position.set(v.x, v.y, v.z);
     this.scene.add(controlPt);
   }
@@ -131,20 +180,8 @@ class Surface {
 
     if (this.controls) {
 
-      this.addControl(this.v0.__bez.v0, 3);
-      this.addControl(this.v0.__bez.v1, 2);
-      this.addControl(this.v0.__bez.v2, 2);
-      this.addControl(this.v0.__bez.v3, 3);
-
-      this.addControl(this.v1.__bez.v0, 3);
-      this.addControl(this.v1.__bez.v1, 2);
-      this.addControl(this.v1.__bez.v2, 2);
-      this.addControl(this.v1.__bez.v3, 3);
-
-      this.addControl(this.u0.__bez.v1, 2);
-      this.addControl(this.u0.__bez.v2, 2);
-      this.addControl(this.u1.__bez.v1, 2);
-      this.addControl(this.u1.__bez.v2, 2);
+      // add control points
+      this.controlPointsList.forEach(pt => this.addControlPt(pt));
 
       this.addControlLine(this.v0.__bez.v0, this.v0.__bez.v1);
       this.addControlLine(this.v0.__bez.v0, this.u0.__bez.v1);
@@ -211,36 +248,46 @@ class Surface {
     }
   }
 
-  morph(duration, cb) {
+  randomize(duration, cb) {
 
     let r = () => Math.random();
     let rp = () => p(r(), r(), r());
 
     // target surface to morph toward
-    let s = new Surface();
+    let s = this.clone();
 
     ["u0", "u1", "v0", "v1"].forEach((k) => {
 
       let b = this[k].__bez; // boundary curve
-      
-      s[k] = this[k].clone(); // boundary curve object of new surface = same as this
-      s[k].__bez = b;
+
+      ["v0", "v1", "v2", "v3"].forEach((pt) => {
+        // add a random value to it
+        s[k].__bez[pt] = b[pt].clone().add(rp());
+      });
+    });
+
+    // now that we have the target surface, step toward it
+    this.morph(s, duration, cb);
+  }
+
+  morph(targetSrf, duration, cb) {
+
+    ["u0", "u1", "v0", "v1"].forEach((k) => {
+
+      let b = this[k].__bez; // boundary curve
 
       ["v0", "v1", "v2", "v3"].forEach((pt) => {
 
         // for legibility, this is the point on the target surface
         // corresponding to the current boundary curve's control point
         let srfPt = b[pt];
-        let targetPt = s[k].__bez[pt];
-
-        // add a random value to it
-        targetPt = b[pt].clone().add(rp());
+        let targetPt = targetSrf[k].__bez[pt];
 
         // resolve corner cases
-        if (k === "v0" && pt === "v0") targetPt = this.u0.__bez.v0;
-        if (k === "v0" && pt === "v3") targetPt = this.u1.__bez.v0;
-        if (k === "v1" && pt === "v0") targetPt = this.u0.__bez.v3;
-        if (k === "v1" && pt === "v3") targetPt = this.u1.__bez.v3;
+        if (k === "v0" && pt === "v0") targetPt = targetSrf.u0.__bez.v0;
+        if (k === "v0" && pt === "v3") targetPt = targetSrf.u1.__bez.v0;
+        if (k === "v1" && pt === "v0") targetPt = targetSrf.u0.__bez.v3;
+        if (k === "v1" && pt === "v3") targetPt = targetSrf.u1.__bez.v3;
 
         srfPt.__dx = targetPt.x - srfPt.x;
         srfPt.__dy = targetPt.y - srfPt.y;
@@ -248,33 +295,12 @@ class Surface {
       });
     });
 
-    // now that we have the target surface, step toward it
+    // now that we our dx, dy, dz, step toward it
     this.step(0, duration, cb);
   }
 
   restore(duration, cb) {
-
-    let s = new Surface();
-
-    ["u0", "u1", "v0", "v1"].forEach((k) => {
-
-      let b = this[k].__bez; // boundary curve
-
-      ["v0", "v1", "v2", "v3"].forEach((pt) => {
-
-        // for legibility, this is the point on the target surface
-        // corresponding to the current boundary curve's control point
-        let srfPt = b[pt];
-        let targetPt = s[k].__bez[pt];
-
-        srfPt.__dx = targetPt.x - srfPt.x;
-        srfPt.__dy = targetPt.y - srfPt.y;
-        srfPt.__dz = targetPt.z - srfPt.z;
-      });
-    });
-
-    // now that we have the target surface, step toward it
-    this.step(0, duration, cb);
+    this.morph(new Surface(), duration, cb);
   }
 
   rotate(axis, angle) {
@@ -289,6 +315,24 @@ class Surface {
     });
 
     this.update();
+  }
+
+  clone() {
+
+    const s = new Surface();
+
+    s.u0 = this.u0.clone();
+    s.u0.__bez = Object.assign({}, this.u0.__bez);
+    s.u1 = this.u1.clone();
+    s.u1.__bez = Object.assign({}, this.u1.__bez);
+    s.v0 = this.v0.clone();
+    s.v0.__bez = Object.assign({}, this.v0.__bez);
+    s.v1 = this.v1.clone();
+    s.v1.__bez = Object.assign({}, this.v1.__bez);
+
+    s.activeControlPoint = this.activeControlPoint;
+
+    return s;
   }
 }
 

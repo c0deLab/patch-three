@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import _ from 'lodash';
 
 import Surface from './Surface';
+import NumericControls from './NumericControls';
 
 const THREE = require('three');
 
@@ -11,9 +12,30 @@ export default class CanvasView extends Component {
 
 		super();
 
-		this.keys = { LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, SPACE: 32, ESC: 27 };
+		this.state = {
+			i: 0,
+			numericControlsActive: false,
+			numericControlsX: -1,
+			numericControlsY: -1,
+			numericControlIndex: 0,
+		};
+
+		this.surface = new Surface();
+
+		// gets passed to NumericControls
+		this.surfaceManager = {
+			update: (pt) => {
+				this.surface.getActiveControlPoint().set(pt.x, pt.y, pt.z);
+				this.surface.update();
+				this.positionNumericControls();
+				this.draw();
+			}
+		};
+
+		this.keys = { LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, SPACE: 32, ESC: 27, ENTER: 13 };
 		this.keysDown = [];
 
+		this.iter = this.iter.bind(this);
 		this.onResize = _.debounce(this.onResize.bind(this), 250);
 		this.onClick = this.onClick.bind(this);
 		this.onMouseWheel = this.onMouseWheel.bind(this);
@@ -23,6 +45,13 @@ export default class CanvasView extends Component {
 		this.rotateSurface = this.rotateSurface.bind(this);
 		this.toggleSurfaceControls = this.toggleSurfaceControls.bind(this);
 		this.restoreSurface = this.restoreSurface.bind(this);
+		this.toggleNumericControls = this.toggleNumericControls.bind(this);
+		this.positionNumericControls = this.positionNumericControls.bind(this);
+		this.goToNumericControl = this.goToNumericControl.bind(this);
+	}
+
+	iter() {
+		this.setState({ i: this.state.i + 1 });
 	}
 
 	onResize() {
@@ -36,10 +65,15 @@ export default class CanvasView extends Component {
 		this.camera.updateProjectionMatrix();
 		this.renderer.setSize( canvas.width, canvas.height );
 		this.renderer.render(this.scene, this.camera);
+
+		this.positionNumericControls();
 	}
 
 	onClick(e) {
-		this.surface.morph(60, this.draw);
+		this.surface.randomize(60, () => {
+			this.draw();
+			this.positionNumericControls();
+		});
 	}
 
 	onKeyDown(e) {
@@ -53,12 +87,27 @@ export default class CanvasView extends Component {
 		// remove duplicates
 		this.keysDown = _.uniq(this.keysDown);
 
-		// rotating
-		if (!this.isRotating && code >= 37 && code <= 40) this.rotateSurface();
+		// arrow keys
+		if (code >= 37 && code <= 40) {
+			if (this.state.numericControlsActive) {
+				switch (code) {
+					case this.keys.UP:
+						this.goToNumericControl(-1);
+						break;
+					case this.keys.DOWN:
+						this.goToNumericControl(1);
+						break;
+					default:
+				}
+			} else {
+				if (!this.isRotating) this.rotateSurface();
+			}
+		}
 
 		// others
 		if (_.indexOf(this.keysDown, this.keys.SPACE) >= 0) this.toggleSurfaceControls();
 		if (_.indexOf(this.keysDown, this.keys.ESC) >= 0) this.restoreSurface();
+		if (_.indexOf(this.keysDown, this.keys.ENTER) >= 0) this.toggleNumericControls();
 	}
 
 	onKeyUp(e) {
@@ -67,12 +116,21 @@ export default class CanvasView extends Component {
 	}
 
 	onMouseWheel(e) {
+
 		e.preventDefault();
 
-		const zoomOut = e.deltaY > 0;     // boolean
-    const factor = zoomOut ? 1.1 : 0.9; // number
+		// scrub through control points
+		if (this.state.numericControlsActive) {
 
-    this.camera.position.multiplyScalar(factor);
+			this.surface.setActiveControlPoint(e.deltaY > 0 ? 1 : -1);
+			this.positionNumericControls();
+
+		// zooming
+		} else {
+			const zoomOut = e.deltaY > 0;     // boolean
+	    const factor = zoomOut ? 1.1 : 0.9; // number
+	    this.camera.position.multiplyScalar(factor);
+		}
 
     this.draw();
 	}
@@ -118,12 +176,75 @@ export default class CanvasView extends Component {
 	}
 
 	toggleSurfaceControls() {
+		// don't toggle if numeric controls active
+		if (this.state.numericControlsActive) return;
 		this.surface.toggleControls();
 		this.draw();
 	}
 
 	restoreSurface() {
-		this.surface.restore(60, this.draw);
+		this.surface.restore(60, () => {
+			this.draw();
+			this.positionNumericControls();
+		});
+	}
+
+	positionNumericControls() {
+		// get active control point location in screen space
+		// to decide where to show NumericControls
+		let pt = this.surface.getActiveControlPoint();
+		if (_.isNil(pt)) return;
+
+		// ACHTUNG: these numbers are hardcoded in NumericControls.css
+		const width = 200;
+		const height = 174;
+
+		pt = pt.clone();
+		pt.project(this.camera);
+
+		// depending on which 'quadrant' it is in,
+		// move toward the outside of the screen
+		const dx = (pt.x < 0 ? -1 :  1) * width  / 2 + (pt.x < 0 ? -1 :  1) * 15;
+		const dy = (pt.y < 0 ?  1 : -1) * height / 2 + (pt.y < 0 ?  1 : -1) * 15;
+
+		pt.x = Math.round(( pt.x + 1) * this.canvas.width / 2) + dx;
+		pt.y = Math.round((-pt.y + 1) * this.canvas.height / 2) + dy;
+
+		// keep it on the screen...
+		// right
+		if (pt.x + width / 2 > this.canvas.width) pt.x = this.canvas.width - width / 2;
+		// left
+		if (pt.x - width / 2 < 0) pt.x = width / 2;
+		// bottom
+		if (pt.y + height / 2 > this.canvas.height) pt.y = this.canvas.height - height / 2;
+		// top
+		if (pt.y - height / 2 < 0) pt.y = height / 2;
+
+		this.setState({
+			numericControlsX: pt.x,
+			numericControlsY: pt.y,
+		});
+	}
+
+	toggleNumericControls() {
+
+		this.setState({
+			numericControlsActive: !this.state.numericControlsActive
+		}, () => {
+			if (this.state.numericControlsActive) {
+				this.surface.activateControls();
+				this.positionNumericControls();
+			} else {
+				this.surface.deactivateControlPoint();
+			}
+			this.draw();
+		});
+	}
+
+	goToNumericControl(dir) {
+		this.setState({
+			numericControlIndex: (this.state.numericControlIndex + dir + 3) % 3
+		});
 	}
 
 	componentDidMount() {
@@ -149,7 +270,6 @@ export default class CanvasView extends Component {
 		
 		this.onResize();
 
-		this.surface = new Surface();
 		this.surface.setScene(this.scene);
 		this.surface.update();
 		
@@ -163,6 +283,23 @@ export default class CanvasView extends Component {
 	}
 
 	render() {
-		return <canvas ref="canvas" />
+
+		const numericControlsStyle = {
+			display: this.state.numericControlsActive ? 'block' : 'none',
+			left: this.state.numericControlsX,
+			top: this.state.numericControlsY,
+		};
+
+		return (
+			<div>
+				<canvas ref="canvas" />
+				<NumericControls 
+					surface={this.surface} 
+					surfaceManager={this.surfaceManager}
+					style={numericControlsStyle}
+					active={this.state.numericControlsActive} 
+					activeIndex={this.state.numericControlIndex} />
+			</div>
+		)
 	}
 };

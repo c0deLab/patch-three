@@ -1,0 +1,29 @@
+.numeric-controls {
+	background: rgba(255, 255, 255, 0.2);
+	position: absolute;
+	padding: 20px;
+	transform: translateX(-50%) translateY(-50%);
+
+	height: 174px;
+	width: 200px;
+}
+
+	.numeric-controls--active { transition: 0.15s all; }
+
+.numeric-controls input {
+	background: #000;
+	border: 2px solid transparent;
+	color: #fff;
+	display: block;
+	font-family: 'Courier', monospace;
+	font-size: 18px;
+	margin-bottom: 4px;
+	outline: 0;
+	text-align: center;
+	padding: 8px;
+	width: 100%;
+}
+
+.numeric-controls input:focus {
+	border-color: #666;
+}
