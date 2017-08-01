@@ -3,6 +3,7 @@ import _ from 'lodash';
 
 import Surface from './Surface';
 import NumericControls from './NumericControls';
+import Instructions from './Instructions';
 
 const THREE = require('three');
 
@@ -299,6 +300,7 @@ export default class CanvasView extends Component {
 					style={numericControlsStyle}
 					active={this.state.numericControlsActive} 
 					activeIndex={this.state.numericControlIndex} />
+				<Instructions />
 			</div>
 		)
 	}
