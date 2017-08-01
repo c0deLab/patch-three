@@ -23,6 +23,7 @@ export default class Instructions extends Component {
 			<div className="instructions">
 				<div className="instructions__overlay">
 					<p><b>CLICK</b> anywhere to morph the surface.</p>
+					<p><b>ESC</b> to restore after any changes.</p>
 					<p><b>SPACE BAR</b> to toggle control points.</p>
 					<p><b>ENTER</b> to activate numeric controls.</p>
 					<p>...if numeric controls <b>are not</b> active:</p>

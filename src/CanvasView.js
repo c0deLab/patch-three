@@ -26,7 +26,7 @@ export default class CanvasView extends Component {
 		// gets passed to NumericControls
 		this.surfaceManager = {
 			update: (pt) => {
-				this.surface.getActiveControlPoint().set(pt.x, pt.y, pt.z);
+				this.surface.setActiveControlPoint(pt);
 				this.surface.update();
 				this.positionNumericControls();
 				this.draw();
@@ -123,7 +123,7 @@ export default class CanvasView extends Component {
 		// scrub through control points
 		if (this.state.numericControlsActive) {
 
-			this.surface.setActiveControlPoint(e.deltaY > 0 ? 1 : -1);
+			this.surface.setActiveControlPointIndex(e.deltaY > 0 ? 1 : -1);
 			this.positionNumericControls();
 
 		// zooming
@@ -258,7 +258,7 @@ export default class CanvasView extends Component {
 		this.scene = new THREE.Scene();
 		
 		this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 200);
-		this.camera.position.set(0, 0, -2);
+		this.camera.position.set(0, 0, 2);
 		this.camera.lookAt(new THREE.Vector3(0, 0, 0));
 
 		this.renderer = new THREE.WebGLRenderer({

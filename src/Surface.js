@@ -81,7 +81,7 @@ class Surface {
     this.deactivateControlPoint();
   }
 
-  setActiveControlPoint(i) {
+  setActiveControlPointIndex(i) {
     const l = this.controlPointsList.length;
     this.activeControlPoint = (this.activeControlPoint + i + l) % l;
     this.update();
@@ -103,6 +103,48 @@ class Surface {
   getActiveControlPoint() {
     if (this.activeControlPoint === -1) return null;
     return this.controlPointFromIndex(this.activeControlPoint);
+  }
+
+  setActiveControlPoint(pt) {
+
+    const index = this.activeControlPoint;
+    if (index === -1) return;
+
+    const arr = this.controlPointsList[index];
+    let crv = arr[0];
+    let v = this[crv].__bez[arr[1]];
+
+    // set the point
+    v.set(pt.x, pt.y, pt.z);
+
+    // if at a corner point, find the matching one and set it as well
+    let matchingPt = null;
+    switch (crv) {
+      case "u0":
+        if (arr[1] === "v0") matchingPt = ["v0", "v0"];
+        if (arr[1] === "v3") matchingPt = ["v1", "v0"];
+        break;
+      case "u1":
+        if (arr[1] === "v0") matchingPt = ["v0", "v3"];
+        if (arr[1] === "v3") matchingPt = ["v1", "v3"];
+        break;
+      case "v0":
+        if (arr[1] === "v0") matchingPt = ["u0", "v0"];
+        if (arr[1] === "v3") matchingPt = ["u1", "v0"];
+        break;
+      case "v1":
+        if (arr[1] === "v0") matchingPt = ["u0", "v3"];
+        if (arr[1] === "v3") matchingPt = ["u1", "v3"];
+        break;
+      default:
+    }
+
+    if (!matchingPt) return;
+
+    crv = this[matchingPt[0]];
+    v = crv.__bez[matchingPt[1]];
+    
+    v.set(pt.x, pt.y, pt.z);
   }
 
   toggleControls() {
@@ -143,6 +185,7 @@ class Surface {
 
   	// tear down all existing scene objects
     const children = this.scene.children;
+
     // clean up
     while (children.length > 0) {
       const child = children.pop();
@@ -212,8 +255,8 @@ class Surface {
     const v0 = this.v0.__bez;
     const v1 = this.v1.__bez;
 
-    const Lu = u0.getPoint(u).multiplyScalar(1 - v).add(u1.getPoint(u).multiplyScalar(v));
-    const Lv = v0.getPoint(v).multiplyScalar(1 - u).add(v1.getPoint(v).multiplyScalar(u));
+    const Lu = u0.getPoint(u).multiplyScalar(1 - v).add( u1.getPoint(u).multiplyScalar(v) );
+    const Lv = v0.getPoint(v).multiplyScalar(1 - u).add( v1.getPoint(v).multiplyScalar(u) );
     const B = u0.getPoint(0).multiplyScalar((1 - u) * (1 - v))
             .add(u0.getPoint(1).multiplyScalar(u * (1 - v)))
             .add(u1.getPoint(0).multiplyScalar((1 - u) * v))
@@ -261,7 +304,9 @@ class Surface {
       let b = this[k].__bez; // boundary curve
 
       ["v0", "v1", "v2", "v3"].forEach((pt) => {
-        // add a random value to it
+        // add a random value to it --
+        // it's ok if corners don't match here since
+        // morph calls .resolve() on the targetSrf
         s[k].__bez[pt] = b[pt].clone().add(rp());
       });
     });
@@ -271,6 +316,8 @@ class Surface {
   }
 
   morph(targetSrf, duration, cb) {
+
+    targetSrf.resolve();
 
     ["u0", "u1", "v0", "v1"].forEach((k) => {
 
@@ -333,6 +380,23 @@ class Surface {
     s.activeControlPoint = this.activeControlPoint;
 
     return s;
+  }
+
+  /*
+   * If there's a chance that a surface's corner points don't match,
+   * pass it through this function to in-place resolve corner cases
+   * (u curve control points overwrite those of v curves)
+   */
+  resolve() {
+    ["u0", "u1", "v0", "v1"].forEach((k) => {
+      ["v0", "v1", "v2", "v3"].forEach((pt) => {
+        // resolve corner cases
+        if (k === "v0" && pt === "v0") this[k].__bez[pt] = this.u0.__bez.v0;
+        if (k === "v0" && pt === "v3") this[k].__bez[pt] = this.u1.__bez.v0;
+        if (k === "v1" && pt === "v0") this[k].__bez[pt] = this.u0.__bez.v3;
+        if (k === "v1" && pt === "v3") this[k].__bez[pt] = this.u1.__bez.v3;
+      });
+    });
   }
 }
 

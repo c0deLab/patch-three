@@ -24,6 +24,7 @@
 
 .instructions__overlay {
 	background: rgba(0, 0, 0, 0.75);
+	font-size: 20px;
 	position: absolute;
 	padding: 15vh 15vw;
 	position: fixed;
