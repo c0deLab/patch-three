@@ -28,7 +28,7 @@ export default class Instructions extends Component {
 					<p><b>ENTER</b> to activate numeric controls.</p>
 					<p>...if numeric controls <b>are not</b> active:</p>
 					<ul>
-						<li><b>ARROW KEYS</b> to rotate the surface in space.</li>
+						<li><b>ARROW KEYS</b> to rotate the camera.</li>
 						<li><b>WHEEL</b> to zoom in and out.</li>
 					</ul>
 					<p>...if numeric controls <b>are</b> active:</p>

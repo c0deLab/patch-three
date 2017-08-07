@@ -5,7 +5,11 @@ import {
   interiorMaterial,
   controlMaterial,
   controlPtMaterial,
-  activeControlPointMaterial
+  activeControlPointMaterial,
+  axisMaterial,
+  axisX,
+  axisY,
+  axisZ
 } from './utils/surface-helpers';
 
 const THREE = require('three');
@@ -145,6 +149,8 @@ class Surface {
     v = crv.__bez[matchingPt[1]];
     
     v.set(pt.x, pt.y, pt.z);
+
+    this.positionAxes(v);
   }
 
   toggleControls() {
@@ -162,7 +168,7 @@ class Surface {
     // index 2 = size of sphere
     const crv = this[pt[0]];
     const v = crv.__bez[pt[1]];
-    const size = isActive ? 6 : pt[2];
+    const size = pt[2] * (isActive ? 1.5 : 1);
 
     const d = 0.006 * size;
 
@@ -179,6 +185,12 @@ class Surface {
     this.scene.add(new THREE.Line(lineGeo, controlMaterial));
   }
 
+  positionAxes(pt) {
+    axisX.position.set(pt.x, pt.y, pt.z);
+    axisY.position.set(pt.x, pt.y, pt.z);
+    axisZ.position.set(pt.x, pt.y, pt.z);
+  }
+
   setScene(scene) { this.scene = scene; }
   
   update() {
@@ -193,6 +205,12 @@ class Surface {
       child.geometry.dispose();
       child.material.dispose();
     }
+
+    // add axes, assume they are not being shown
+    this.scene.add(axisX);
+    this.scene.add(axisY);
+    this.scene.add(axisZ);
+    axisMaterial.opacity = 0;
 
   	// add interior curves
   	const step = 0.04;
@@ -222,6 +240,11 @@ class Surface {
   	}
 
     if (this.controls) {
+
+      if (this.activeControlPoint > -1) {
+        axisMaterial.opacity = 0.4;
+        this.positionAxes(this.getActiveControlPoint());
+      }
 
       // add control points
       this.controlPointsList.forEach(pt => this.addControlPt(pt));
@@ -282,6 +305,7 @@ class Surface {
     });
 
     this.update(); // update interior curves
+    if (this.activeControlPoint > -1) this.positionAxes(this.getActiveControlPoint());
 
     if (t < duration && cb) {
       window.requestAnimationFrame(() => {

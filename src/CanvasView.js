@@ -7,6 +7,40 @@ import Instructions from './Instructions';
 
 const THREE = require('three');
 
+const axisGeoX = new THREE.Geometry();
+const axisGeoY = new THREE.Geometry();
+const axisGeoZ = new THREE.Geometry();
+
+axisGeoX.vertices.push(
+	new THREE.Vector3(-10000, 0, 0),
+	new THREE.Vector3( 10000, 0, 0)
+);
+axisGeoY.vertices.push(
+	new THREE.Vector3(0, -10000, 0),
+	new THREE.Vector3(0,  10000, 0)
+);
+axisGeoZ.vertices.push(
+	new THREE.Vector3(0, 0, -10000),
+	new THREE.Vector3(0, 0,  10000)
+);
+
+const axisMaterial = new THREE.LineDashedMaterial({
+	color: 0xffffff,
+	linewidth: 1,
+	dashSize: 0.06,
+	gapSize: 0.06,
+	opacity: 0.5,
+	transparent: true
+});
+
+axisGeoX.computeLineDistances();
+axisGeoY.computeLineDistances();
+axisGeoZ.computeLineDistances();
+
+const axisX = new THREE.Line(axisGeoX, axisMaterial);
+const axisY = new THREE.Line(axisGeoY, axisMaterial);
+const axisZ = new THREE.Line(axisGeoZ, axisMaterial);
+
 export default class CanvasView extends Component {
 	
 	constructor() {
@@ -33,7 +67,7 @@ export default class CanvasView extends Component {
 			}
 		};
 
-		this.keys = { LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, SPACE: 32, ESC: 27, ENTER: 13 };
+		this.keys = { LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, SPACE: 32, ESC: 27, ENTER: 13, SHIFT: 16 };
 		this.keysDown = [];
 
 		this.iter = this.iter.bind(this);
@@ -43,7 +77,7 @@ export default class CanvasView extends Component {
 		this.onKeyDown = this.onKeyDown.bind(this);
 		this.onKeyUp = this.onKeyUp.bind(this);
 		this.draw = this.draw.bind(this);
-		this.rotateSurface = this.rotateSurface.bind(this);
+		this.rotateCamera = this.rotateCamera.bind(this);
 		this.toggleSurfaceControls = this.toggleSurfaceControls.bind(this);
 		this.restoreSurface = this.restoreSurface.bind(this);
 		this.toggleNumericControls = this.toggleNumericControls.bind(this);
@@ -101,7 +135,7 @@ export default class CanvasView extends Component {
 					default:
 				}
 			} else {
-				if (!this.isRotating) this.rotateSurface();
+				if (!this.isRotating) this.rotateCamera();
 			}
 		}
 
@@ -137,10 +171,15 @@ export default class CanvasView extends Component {
 	}
 
 	draw() {
+
+		this.scene.add(axisX);
+		this.scene.add(axisY);
+		this.scene.add(axisZ);
+
 		this.renderer.render(this.scene, this.camera);
 	}
 
-	rotateSurface() {
+	rotateCamera() {
 
 		let angle = 0;
 		let axis = new THREE.Vector3(0, 1, 0);
@@ -164,13 +203,13 @@ export default class CanvasView extends Component {
 
 			this.isRotating = true;
 
-			let surface = this.surface;
-
-			surface.rotate(axis, angle);
+			this.camera.position.applyAxisAngle(axis, angle);
+			this.camera.lookAt(new THREE.Vector3(0, 0, 0));
+			this.camera.up = new THREE.Vector3(0, 0, 1);
 
 			this.draw();
 			
-			window.requestAnimationFrame(this.rotateSurface);
+			window.requestAnimationFrame(this.rotateCamera);
 		} else {
 			this.isRotating = false;
 		}
@@ -257,7 +296,7 @@ export default class CanvasView extends Component {
 		// set up scene, camera, renderer
 		this.scene = new THREE.Scene();
 		
-		this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 200);
+		this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
 		this.camera.position.set(0, 0, 2);
 		this.camera.lookAt(new THREE.Vector3(0, 0, 0));
 
