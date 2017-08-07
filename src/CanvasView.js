@@ -38,6 +38,9 @@ export default class CanvasView extends Component {
 		this.keys = { LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, SPACE: 32, ESC: 27, ENTER: 13, SHIFT: 16 };
 		this.keysDown = [];
 
+		this.azimuth = 0;
+		this.altitude = Math.PI / 2;
+
 		this.iter = this.iter.bind(this);
 		this.onResize = _.debounce(this.onResize.bind(this), 250);
 		this.onClick = this.onClick.bind(this);
@@ -45,6 +48,7 @@ export default class CanvasView extends Component {
 		this.onKeyDown = this.onKeyDown.bind(this);
 		this.onKeyUp = this.onKeyUp.bind(this);
 		this.draw = this.draw.bind(this);
+		this.positionCamera = this.positionCamera.bind(this);
 		this.rotateCamera = this.rotateCamera.bind(this);
 		this.toggleSurfaceControls = this.toggleSurfaceControls.bind(this);
 		this.restoreSurface = this.restoreSurface.bind(this);
@@ -132,7 +136,8 @@ export default class CanvasView extends Component {
 		} else {
 			const zoomOut = e.deltaY > 0;     // boolean
 	    const factor = zoomOut ? 1.1 : 0.9; // number
-	    this.camera.position.multiplyScalar(factor);
+	    this.camera.zoom *= factor;
+	    this.camera.updateProjectionMatrix();
 		}
 
     this.draw();
@@ -149,31 +154,39 @@ export default class CanvasView extends Component {
 
 	rotateCamera() {
 
-		let angle = 0;
+		let angle = 0.02;
 		let axis = new THREE.Vector3(0, 1, 0);
 
 		const key = _.last(this.keysDown);
+		console.log(key, this.keys.DOWN);
 
-		if (key === this.keys.RIGHT) angle = 1;
-		if (key === this.keys.LEFT) angle = -1;
-		if (key === this.keys.UP) {
-			angle = 1;
-			axis = new THREE.Vector3(1, 0, 0);
-		}
-		if (key === this.keys.DOWN) {
-			angle = -1;
-			axis = new THREE.Vector3(1, 0, 0);
+		switch (key) {
+			case this.keys.RIGHT:
+				this.azimuth += angle;
+				break;
+			case this.keys.LEFT:
+				this.azimuth -= angle;
+				break;
+			case this.keys.UP:
+				this.altitude += angle;
+				break;
+			case this.keys.DOWN:
+				this.altitude -= angle;
+				break;
+			default:
+				angle = 0;
 		}
 
-		angle *= 0.02;
+		// for max altitude = PI / 2, looking straight down
+		// for min altitude = -PI / 2, looking straight up
+		// (higher or lower is not allowed)
+		this.altitude = _.clamp(this.altitude, -Math.PI / 2, Math.PI / 2);
 
 		if (angle !== 0) {
 
 			this.isRotating = true;
 
-			this.camera.position.applyAxisAngle(axis, angle);
-			this.camera.lookAt(new THREE.Vector3(0, 0, 0));
-			this.camera.up = new THREE.Vector3(0, 0, 1);
+			this.positionCamera();
 
 			this.draw();
 			
@@ -255,6 +268,22 @@ export default class CanvasView extends Component {
 		});
 	}
 
+	positionCamera() {
+
+		let x = 2 * Math.cos(this.azimuth) * Math.cos(this.altitude);
+		let y = 2 * Math.sin(this.azimuth) * Math.cos(this.altitude);
+		let z = 2 * Math.sin(this.altitude);
+
+		if (x == 0 && y == 0) x = 0.001; // fudge factor to prevent gimbal lock
+
+		this.camera.position.set(x, y, z);
+		this.camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+		this.camera.up = new THREE.Vector3(0, 0, 1);
+
+		this.camera.updateProjectionMatrix();
+	}
+
 	componentDidMount() {
 
 		// set up canvas
@@ -265,8 +294,7 @@ export default class CanvasView extends Component {
 		this.scene = new THREE.Scene();
 		
 		this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
-		this.camera.position.set(0, 0, 2);
-		this.camera.lookAt(new THREE.Vector3(0, 0, 0));
+		this.positionCamera();
 
 		this.renderer = new THREE.WebGLRenderer({
 			canvas: this.refs.canvas,
