@@ -103,61 +103,58 @@ export default class CanvasView extends Component {
 	}
 
 	onClick(e) {
-		this.surface.randomize(60, () => {
-			this.draw();
-			this.positionCoordinates();
-		});
+		this.surface.randomize(60, this.draw);
 	}
 
 	onKeyDown(e) {
 
 		const code = e.keyCode;
 
-		if (code in this.keys) {
+		if (!(code in this.keys)) return;
 
-			let action = this.keys[code];
+		let action = this.keys[code];
 
-			if (action === this.state.action) action = null;
+		if (action === this.state.action) action = null;
 
-			if (_.isFunction(this.actions[action]) || action === null) this.setState({ action });
+		if (_.isFunction(this.actions[action]) || action === null) this.setState({ action });
 
-			// some keys want things to happen on keydown, not just wheel
-			if (action === "TOGGLE") {
+		// some keys should trigger changes by themselves,
+		// not just setting the action for the wheel to handle
+		if (action === "TOGGLE") {
 
-				if (!this.surface.controls) {
+			if (!this.surface.controls) {
 
-					this.surface.activateControls();
+				this.surface.activateControls();
 
-					this.setState({ coordinates: true });
-					this.positionCoordinates();
-				} else {
-					this.surface.setAxis(null);
-					this.surface.update();
-				}
-
-			} else if (action === "X_AXIS" || action === "Y_AXIS" || action === "Z_AXIS") {
-				switch (action) {
-					case "X_AXIS": 
-						this.surface.setAxis("x");
-						break;
-					case "Y_AXIS":
-						this.surface.setAxis("y");
-						break;
-					case "Z_AXIS":
-						this.surface.setAxis("z");
-						break;
-					default:
-				}
-				this.surface.update();
-			} else if (action === "RESTORE") {
-				this.restoreSurface();
+				this.setState({ coordinates: true });
+				this.positionCoordinates();
 			} else {
-				this.setState({ coordinates: false });
-				this.surface.deactivateControls();
+				this.surface.setAxis(null);
+				this.surface.update();
 			}
 
-			this.draw();
+		} else if (action === "X_AXIS" || action === "Y_AXIS" || action === "Z_AXIS") {
+			switch (action) {
+				case "X_AXIS": 
+					this.surface.setAxis("x");
+					break;
+				case "Y_AXIS":
+					this.surface.setAxis("y");
+					break;
+				case "Z_AXIS":
+					this.surface.setAxis("z");
+					break;
+				default:
+			}
+			this.surface.update();
+		} else if (action === "RESTORE") {
+			this.restoreSurface();
+		} else {
+			this.setState({ coordinates: false });
+			this.surface.deactivateControls();
 		}
+
+		this.draw();
 	}
 
 	onWheel(e) {
@@ -166,13 +163,19 @@ export default class CanvasView extends Component {
 
 		const action = this.state.action;
 
-		if (action in this.actions) this.actions[action](-e.deltaY);
+		if (!(action in this.actions)) return;
+
+		this.actions[action](-e.deltaY);
 
 		this.draw();
 	}
 
 	draw() {
 
+		// a little messy, but this.surface removes all children
+		// from the scene when this.surface.update() is called...
+		// thus need to re-add the axes to the scene whenever the surface
+		// might possibly have updated.
 		this.scene.add(axisX);
 		this.scene.add(axisY);
 		this.scene.add(axisZ);
