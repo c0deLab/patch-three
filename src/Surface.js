@@ -1,3 +1,5 @@
+import _ from 'lodash';
+
 import easing from './utils/easing';
 import { 
   p,
@@ -6,7 +8,6 @@ import {
   controlMaterial,
   controlPtMaterial,
   activeControlPointMaterial,
-  axisMaterial,
   axisX,
   axisY,
   axisZ
@@ -70,7 +71,7 @@ class Surface {
     this.lastActiveControlPoint = -1;
 
     this.controls = false;
-
+    this.axis = null;
   }
 
   activateControls() {
@@ -83,6 +84,8 @@ class Surface {
   deactivateControls() {
     this.controls = false;
     this.deactivateControlPoint();
+    this.setAxis(null);
+    this.update();
   }
 
   setActiveControlPointIndex(i) {
@@ -109,7 +112,9 @@ class Surface {
     return this.controlPointFromIndex(this.activeControlPoint);
   }
 
-  setActiveControlPoint(pt) {
+  setActiveControlPoint(pt, axis) {
+
+    this.setAxis(axis);
 
     const index = this.activeControlPoint;
     if (index === -1) return;
@@ -151,6 +156,8 @@ class Surface {
     v.set(pt.x, pt.y, pt.z);
 
     this.positionAxes(v);
+
+    this.update();
   }
 
   toggleControls() {
@@ -186,12 +193,15 @@ class Surface {
   }
 
   positionAxes(pt) {
+    if (_.isNil(pt)) return;
     axisX.position.set(pt.x, pt.y, pt.z);
     axisY.position.set(pt.x, pt.y, pt.z);
     axisZ.position.set(pt.x, pt.y, pt.z);
   }
 
   setScene(scene) { this.scene = scene; }
+
+  setAxis(axis) { this.axis = axis; }
   
   update() {
 
@@ -200,17 +210,21 @@ class Surface {
 
     // clean up
     while (children.length > 0) {
+      
       const child = children.pop();
+      
+      if (child.type !== "Group") {
+        child.geometry.dispose();
+        child.material.dispose();
+      }
+      
       this.scene.remove(child);
-      child.geometry.dispose();
-      child.material.dispose();
     }
 
     // add axes, assume they are not being shown
     this.scene.add(axisX);
     this.scene.add(axisY);
     this.scene.add(axisZ);
-    axisMaterial.opacity = 0;
 
   	// add interior curves
   	const step = 0.04;
@@ -239,12 +253,17 @@ class Surface {
       this.scene.add(new THREE.Line(v_crv, material));
   	}
 
+    axisX.visible = false;
+    axisY.visible = false;
+    axisZ.visible = false;
+
     if (this.controls) {
 
-      if (this.activeControlPoint > -1) {
-        axisMaterial.opacity = 0.4;
-        this.positionAxes(this.getActiveControlPoint());
-      }
+      this.positionAxes(this.getActiveControlPoint());
+
+      if (this.axis === "x") axisX.visible = true;
+      if (this.axis === "y") axisY.visible = true;
+      if (this.axis === "z") axisZ.visible = true;
 
       // add control points
       this.controlPointsList.forEach(pt => this.addControlPt(pt));

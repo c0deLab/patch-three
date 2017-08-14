@@ -1,62 +1,88 @@
 import React, { Component } from 'react';
+import ReactDOM from 'react-dom';
 import _ from 'lodash';
 
 import Surface from './Surface';
-import NumericControls from './NumericControls';
-import Instructions from './Instructions';
+import Coordinates from './Coordinates';
 
 import { axisX, axisY, axisZ } from './utils/canvas-helpers';
 
 const THREE = require('three');
 
+/**
+ * Responsible for maintaining app state, including the Surface,
+ * handling user interactions, and drawing to the screen.
+ */
 export default class CanvasView extends Component {
 	
 	constructor() {
 
 		super();
 
+		/**
+		 * Initial state:
+		 * - no action selected (control knob does nothing)
+		 * - iteration set to 0
+		 * - coordinates not visible
+		 */
 		this.state = {
+			action: null,
 			i: 0,
-			numericControlsActive: false,
-			numericControlsX: -1,
-			numericControlsY: -1,
-			numericControlIndex: 0,
+			coordinates: false
 		};
 
 		this.surface = new Surface();
 
-		// gets passed to NumericControls
-		this.surfaceManager = {
-			update: (pt) => {
-				this.surface.setActiveControlPoint(pt);
-				this.surface.update();
-				this.positionNumericControls();
-				this.draw();
-			}
+		this.actions = {
+			TOGGLE: _.throttle(this.toggle.bind(this), 250),
+			"←→": this.rotateCameraXY.bind(this),
+			"↑↓": this.rotateCameraZ.bind(this),
+			ZOOM: this.zoom.bind(this),
+			X_AXIS: this.updateControlPoint.bind(this, "x"),
+			Y_AXIS: this.updateControlPoint.bind(this, "y"),
+			Z_AXIS: this.updateControlPoint.bind(this, "z"),
 		};
 
-		this.keys = { LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, SPACE: 32, ESC: 27, ENTER: 13, SHIFT: 16 };
-		this.keysDown = [];
+		this.keys = { 
+			37: "←→",			// left
+			39: "←→",			// right
+			38: "↑↓",			// up
+			40: "↑↓",			// down
+			80: "TOGGLE", // p
+			67: "ZOOM", 	// c
+			88: "X_AXIS", // x
+			89: "Y_AXIS", // y
+			90: "Z_AXIS", // z
+			27: "RESTORE",// esc
+		};
 
-		this.azimuth = 0;
-		this.altitude = Math.PI / 2;
+		/**
+		 * These two numbers determine camera location.
+		 * Camera is always looking at the origin with z-axis = up.
+		 * See .positionCamera()
+		 */
+		this.azimuth = Math.PI / 8;
+		this.altitude = Math.PI / 4;
 
+		/**
+		 * Bind class methods to always use `this` as calling context.
+		 */
 		this.iter = this.iter.bind(this);
-		this.onResize = _.debounce(this.onResize.bind(this), 250);
+		this.onResize = _.debounce(this.onResize.bind(this), 250); // debounced because expensive
 		this.onClick = this.onClick.bind(this);
-		this.onMouseWheel = this.onMouseWheel.bind(this);
+		this.onWheel = this.onWheel.bind(this);
 		this.onKeyDown = this.onKeyDown.bind(this);
-		this.onKeyUp = this.onKeyUp.bind(this);
 		this.draw = this.draw.bind(this);
+		this.updateControlPoint = this.updateControlPoint.bind(this);
 		this.positionCamera = this.positionCamera.bind(this);
-		this.rotateCamera = this.rotateCamera.bind(this);
-		this.toggleSurfaceControls = this.toggleSurfaceControls.bind(this);
 		this.restoreSurface = this.restoreSurface.bind(this);
-		this.toggleNumericControls = this.toggleNumericControls.bind(this);
-		this.positionNumericControls = this.positionNumericControls.bind(this);
-		this.goToNumericControl = this.goToNumericControl.bind(this);
 	}
 
+	/**
+	 * Method that increases iteration state.
+	 * Useful in that it triggers .render()
+	 * without any other side effects.
+	 */
 	iter() {
 		this.setState({ i: this.state.i + 1 });
 	}
@@ -73,13 +99,13 @@ export default class CanvasView extends Component {
 		this.renderer.setSize( canvas.width, canvas.height );
 		this.renderer.render(this.scene, this.camera);
 
-		this.positionNumericControls();
+		this.positionCoordinates();
 	}
 
 	onClick(e) {
 		this.surface.randomize(60, () => {
 			this.draw();
-			this.positionNumericControls();
+			this.positionCoordinates();
 		});
 	}
 
@@ -87,60 +113,62 @@ export default class CanvasView extends Component {
 
 		const code = e.keyCode;
 
-		Object.values(this.keys).forEach((key) => {
-			if (code === key) this.keysDown.push(code);
-		});
-		
-		// remove duplicates
-		this.keysDown = _.uniq(this.keysDown);
+		if (code in this.keys) {
 
-		// arrow keys
-		if (code >= 37 && code <= 40) {
-			if (this.state.numericControlsActive) {
-				switch (code) {
-					case this.keys.UP:
-						this.goToNumericControl(-1);
+			let action = this.keys[code];
+
+			if (action === this.state.action) action = null;
+
+			if (_.isFunction(this.actions[action]) || action === null) this.setState({ action });
+
+			// some keys want things to happen on keydown, not just wheel
+			if (action === "TOGGLE") {
+
+				if (!this.surface.controls) {
+
+					this.surface.activateControls();
+
+					this.setState({ coordinates: true });
+					this.positionCoordinates();
+				} else {
+					this.surface.setAxis(null);
+					this.surface.update();
+				}
+
+			} else if (action === "X_AXIS" || action === "Y_AXIS" || action === "Z_AXIS") {
+				switch (action) {
+					case "X_AXIS": 
+						this.surface.setAxis("x");
 						break;
-					case this.keys.DOWN:
-						this.goToNumericControl(1);
+					case "Y_AXIS":
+						this.surface.setAxis("y");
+						break;
+					case "Z_AXIS":
+						this.surface.setAxis("z");
 						break;
 					default:
 				}
+				this.surface.update();
+			} else if (action === "RESTORE") {
+				this.restoreSurface();
 			} else {
-				if (!this.isRotating) this.rotateCamera();
+				this.setState({ coordinates: false });
+				this.surface.deactivateControls();
 			}
+
+			this.draw();
 		}
-
-		// others
-		if (_.indexOf(this.keysDown, this.keys.SPACE) >= 0) this.toggleSurfaceControls();
-		if (_.indexOf(this.keysDown, this.keys.ESC) >= 0) this.restoreSurface();
-		if (_.indexOf(this.keysDown, this.keys.ENTER) >= 0) this.toggleNumericControls();
 	}
 
-	onKeyUp(e) {
-		const code = e.keyCode;
-		this.keysDown = this.keysDown.filter(key => key !== code);
-	}
-
-	onMouseWheel(e) {
+	onWheel(e) {
 
 		e.preventDefault();
 
-		// scrub through control points
-		if (this.state.numericControlsActive) {
+		const action = this.state.action;
 
-			this.surface.setActiveControlPointIndex(e.deltaY > 0 ? 1 : -1);
-			this.positionNumericControls();
+		if (action in this.actions) this.actions[action](-e.deltaY);
 
-		// zooming
-		} else {
-			const zoomOut = e.deltaY > 0;     // boolean
-	    const factor = zoomOut ? 1.1 : 0.9; // number
-	    this.camera.zoom *= factor;
-	    this.camera.updateProjectionMatrix();
-		}
-
-    this.draw();
+		this.draw();
 	}
 
 	draw() {
@@ -149,76 +177,47 @@ export default class CanvasView extends Component {
 		this.scene.add(axisY);
 		this.scene.add(axisZ);
 
+		this.positionCamera();
+		this.positionCoordinates();
+
 		this.renderer.render(this.scene, this.camera);
 	}
 
-	rotateCamera() {
+	rotateCameraXY(delta) {
+		let angle = 0.0008 * delta;
+		this.azimuth += angle;
+	}
 
-		let angle = 0.02;
-		let axis = new THREE.Vector3(0, 1, 0);
-
-		const key = _.last(this.keysDown);
-		console.log(key, this.keys.DOWN);
-
-		switch (key) {
-			case this.keys.RIGHT:
-				this.azimuth += angle;
-				break;
-			case this.keys.LEFT:
-				this.azimuth -= angle;
-				break;
-			case this.keys.UP:
-				this.altitude += angle;
-				break;
-			case this.keys.DOWN:
-				this.altitude -= angle;
-				break;
-			default:
-				angle = 0;
-		}
+	rotateCameraZ(delta) {
+		let angle = 0.0008 * delta;
+		this.altitude += angle;
 
 		// for max altitude = PI / 2, looking straight down
 		// for min altitude = -PI / 2, looking straight up
 		// (higher or lower is not allowed)
 		this.altitude = _.clamp(this.altitude, -Math.PI / 2, Math.PI / 2);
-
-		if (angle !== 0) {
-
-			this.isRotating = true;
-
-			this.positionCamera();
-
-			this.draw();
-			
-			window.requestAnimationFrame(this.rotateCamera);
-		} else {
-			this.isRotating = false;
-		}
-	}
-
-	toggleSurfaceControls() {
-		// don't toggle if numeric controls active
-		if (this.state.numericControlsActive) return;
-		this.surface.toggleControls();
-		this.draw();
 	}
 
 	restoreSurface() {
-		this.surface.restore(60, () => {
-			this.draw();
-			this.positionNumericControls();
-		});
+		this.surface.restore(60, this.draw);
 	}
 
-	positionNumericControls() {
+	toggle(delta) {
+		if (Math.abs(delta) < 10) return;
+		this.surface.setActiveControlPointIndex(delta > 0 ? 1 : -1);
+		this.setState({ coordinates: true });
+		this.positionCoordinates();
+	}
+
+	positionCoordinates() {
 		// get active control point location in screen space
 		// to decide where to show NumericControls
 		let pt = this.surface.getActiveControlPoint();
 		if (_.isNil(pt)) return;
 
-		// ACHTUNG: these numbers are hardcoded in NumericControls.css
-		const width = 200;
-		const height = 174;
+		const node = ReactDOM.findDOMNode(this.refs.Coordinates);
+		const width = Math.round(node.getBoundingClientRect().width);
+		const height = Math.round(node.getBoundingClientRect().height);
 
 		pt = pt.clone();
 		pt.project(this.camera);
@@ -228,8 +227,8 @@ export default class CanvasView extends Component {
 		const dx = (pt.x < 0 ? -1 :  1) * width  / 2 + (pt.x < 0 ? -1 :  1) * 15;
 		const dy = (pt.y < 0 ?  1 : -1) * height / 2 + (pt.y < 0 ?  1 : -1) * 15;
 
-		pt.x = Math.round(( pt.x + 1) * this.canvas.width / 2) + dx;
-		pt.y = Math.round((-pt.y + 1) * this.canvas.height / 2) + dy;
+		pt.x = Math.round(( pt.x + 1) * this.canvas.width / 4) + dx;
+		pt.y = Math.round((-pt.y + 1) * this.canvas.height / 4) + dy;
 
 		// keep it on the screen...
 		// right
@@ -242,30 +241,23 @@ export default class CanvasView extends Component {
 		if (pt.y - height / 2 < 0) pt.y = height / 2;
 
 		this.setState({
-			numericControlsX: pt.x,
-			numericControlsY: pt.y,
+			coordinatesX: pt.x,
+			coordinatesY: pt.y,
 		});
 	}
 
-	toggleNumericControls() {
+	updateControlPoint(axis, delta) {
 
-		this.setState({
-			numericControlsActive: !this.state.numericControlsActive
-		}, () => {
-			if (this.state.numericControlsActive) {
-				this.surface.activateControls();
-				this.positionNumericControls();
-			} else {
-				this.surface.deactivateControlPoint();
-			}
-			this.draw();
-		});
-	}
+		const p = this.surface.getActiveControlPoint();
+		if (_.isNil(p)) return;
 
-	goToNumericControl(dir) {
-		this.setState({
-			numericControlIndex: (this.state.numericControlIndex + dir + 3) % 3
-		});
+		let q = p.clone(); 
+		q[axis] += 0.005 * delta;
+
+		this.surface.setActiveControlPoint(q, axis);
+		this.surface.update();
+		this.positionCoordinates();
+		this.draw();
 	}
 
 	positionCamera() {
@@ -274,14 +266,19 @@ export default class CanvasView extends Component {
 		let y = 2 * Math.sin(this.azimuth) * Math.cos(this.altitude);
 		let z = 2 * Math.sin(this.altitude);
 
-		if (x == 0 && y == 0) x = 0.001; // fudge factor to prevent gimbal lock
-
 		this.camera.position.set(x, y, z);
 		this.camera.lookAt(new THREE.Vector3(0, 0, 0));
 
 		this.camera.up = new THREE.Vector3(0, 0, 1);
 
 		this.camera.updateProjectionMatrix();
+	}
+
+	zoom(delta) {
+		const zoomOut = delta < 0;     // boolean
+    const factor = zoomOut ? 1.1 : 0.9; // number
+    this.camera.zoom *= factor;
+    this.camera.updateProjectionMatrix();
 	}
 
 	componentDidMount() {
@@ -294,7 +291,6 @@ export default class CanvasView extends Component {
 		this.scene = new THREE.Scene();
 		
 		this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
-		this.positionCamera();
 
 		this.renderer = new THREE.WebGLRenderer({
 			canvas: this.refs.canvas,
@@ -309,33 +305,45 @@ export default class CanvasView extends Component {
 		this.surface.setScene(this.scene);
 		this.surface.update();
 		
+		// even though .draw() calls .positionCamera(), for some reason if we don't
+		// call it here, camera is messed up at beginning
+		// TODO: probably should figure this out :-|
+		this.positionCamera();
+
 		this.draw();
 
+		// add event listeners
 		window.addEventListener('resize', this.onResize);
 		this.refs.canvas.addEventListener('click', this.onClick);
-    this.refs.canvas.addEventListener('wheel', this.onMouseWheel.bind(this));
+    this.refs.canvas.addEventListener('wheel', this.onWheel.bind(this));
     window.addEventListener('keydown', this.onKeyDown.bind(this));
-    window.addEventListener('keyup', this.onKeyUp.bind(this));
 	}
 
 	render() {
 
-		const numericControlsStyle = {
-			display: this.state.numericControlsActive ? 'block' : 'none',
-			left: this.state.numericControlsX,
-			top: this.state.numericControlsY,
+		const coordinatesStyle = {
+			display: this.state.coordinates ? 'block' : 'none',
+			left: this.state.coordinatesX,
+			top: this.state.coordinatesY,
+		};
+
+		const actionStyle = {
+			left: 20,
+			top: 20,
+			position: 'absolute',
+			color: '#fff',
+			fontFamily: 'monospace'
 		};
 
 		return (
 			<div>
 				<canvas ref="canvas" />
-				<NumericControls 
+				<Coordinates 
+					ref="Coordinates"
 					surface={this.surface} 
-					surfaceManager={this.surfaceManager}
-					style={numericControlsStyle}
-					active={this.state.numericControlsActive} 
-					activeIndex={this.state.numericControlIndex} />
-				<Instructions />
+					style={coordinatesStyle}
+					active={this.state.coordinates} />
+				<div style={actionStyle}>{this.state.action}</div>
 			</div>
 		)
 	}
