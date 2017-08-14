@@ -328,7 +328,7 @@ class Surface {
 
     if (t < duration && cb) {
       window.requestAnimationFrame(() => {
-        cb();
+        cb(t / duration);
         this.step(t + 1, duration, cb);
       });
     }
@@ -336,8 +336,8 @@ class Surface {
 
   randomize(duration, cb) {
 
-    let r = () => Math.random();
-    let rp = () => p(r(), r(), r());
+    let r = () => Math.random() - 0.5;
+    let rp = () => new THREE.Vector3(r(), r(), r());
 
     // target surface to morph toward
     let s = this.clone();
@@ -351,6 +351,30 @@ class Surface {
         // it's ok if corners don't match here since
         // morph calls .resolve() on the targetSrf
         s[k].__bez[pt] = b[pt].clone().add(rp());
+      });
+    });
+
+    // now that we have the target surface, step toward it
+    this.morph(s, duration, cb);
+  }
+
+  randomizeCloseToOriginal(duration, cb) {
+
+    let r = () => Math.random() * 0.8 - 0.4;
+    let rp = () => new THREE.Vector3(r(), r(), r());
+
+    // target surface to morph toward
+    let s = this.clone();
+
+    ["u0", "u1", "v0", "v1"].forEach((k) => {
+
+      let b = (new Surface())[k].__bez; // boundary curve
+
+      ["v0", "v1", "v2", "v3"].forEach((pt) => {
+        // add a random value to it --
+        // it's ok if corners don't match here since
+        // morph calls .resolve() on the targetSrf
+        s[k].__bez[pt] = b[pt].add(rp());
       });
     });
 

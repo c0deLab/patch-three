@@ -6,6 +6,7 @@ import Surface from './Surface';
 import Coordinates from './Coordinates';
 
 import { axisX, axisY, axisZ } from './utils/canvas-helpers';
+import easing from './utils/easing';
 
 const THREE = require('three');
 
@@ -24,11 +25,13 @@ export default class CanvasView extends Component {
 		 * - no action selected (control knob does nothing)
 		 * - iteration set to 0
 		 * - coordinates not visible
+		 * - last interaction happened at this precise moment
 		 */
 		this.state = {
 			action: null,
 			i: 0,
-			coordinates: false
+			coordinates: false,
+			lastInteraction: new Date(),
 		};
 
 		this.surface = new Surface();
@@ -65,9 +68,10 @@ export default class CanvasView extends Component {
 		this.altitude = Math.PI / 4;
 
 		/**
-		 * Bind class methods to always use `this` as calling context.
+		 * Bind class methods that use `this` as calling context.
 		 */
 		this.iter = this.iter.bind(this);
+		this.checkLastInteraction = this.checkLastInteraction.bind(this);
 		this.onResize = _.debounce(this.onResize.bind(this), 250); // debounced because expensive
 		this.onClick = this.onClick.bind(this);
 		this.onWheel = this.onWheel.bind(this);
@@ -87,7 +91,24 @@ export default class CanvasView extends Component {
 		this.setState({ i: this.state.i + 1 });
 	}
 
+	checkLastInteraction() {
+		const t = new Date();
+		if (t - this.state.lastInteraction > 10000) this.surface.randomizeCloseToOriginal(240, (t) => {
+			this.rotateCameraXY(1.5 * easing.dEase(t));
+			this.draw();
+		});
+		setTimeout(this.checkLastInteraction, 10000);
+	}
+
+	updateLastInteraction(cb) {
+		this.setState({
+			lastInteraction: new Date()
+		}, cb);
+	}
+
 	onResize() {
+
+		this.updateLastInteraction();
 
 		const canvas = this.canvas;
 
@@ -103,10 +124,13 @@ export default class CanvasView extends Component {
 	}
 
 	onClick(e) {
+		this.updateLastInteraction();
 		this.surface.randomize(60, this.draw);
 	}
 
 	onKeyDown(e) {
+
+		this.updateLastInteraction();
 
 		const code = e.keyCode;
 
@@ -160,6 +184,8 @@ export default class CanvasView extends Component {
 	onWheel(e) {
 
 		e.preventDefault();
+
+		this.updateLastInteraction();
 
 		const action = this.state.action;
 
@@ -314,6 +340,8 @@ export default class CanvasView extends Component {
 		this.positionCamera();
 
 		this.draw();
+
+		this.checkLastInteraction();
 
 		// add event listeners
 		window.addEventListener('resize', this.onResize);
