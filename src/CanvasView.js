@@ -53,6 +53,7 @@ export default class CanvasView extends Component {
 			40: "↑↓",			// down
 			80: "TOGGLE", // p
 			67: "ZOOM", 	// c
+			85: "DISPLAY",// u
 			88: "X_AXIS", // x
 			89: "Y_AXIS", // y
 			90: "Z_AXIS", // z
@@ -170,9 +171,12 @@ export default class CanvasView extends Component {
 					break;
 				default:
 			}
+
 			this.surface.update();
 		} else if (action === "RESTORE") {
 			this.restoreSurface();
+		} else if (action === "DISPLAY") {
+			this.surface.nextDisplay();
 		} else {
 			this.setState({ coordinates: false });
 			this.surface.deactivateControls();

@@ -72,6 +72,11 @@ class Surface {
 
     this.controls = false;
     this.axis = null;
+
+    // 0 = show both U and V
+    // 1 = show just U
+    // 2 = show just V
+    this.display = 0;
   }
 
   activateControls() {
@@ -243,8 +248,8 @@ class Surface {
 	  		let u_pt = this.patch(u, v);
         let v_pt = this.patch(v, u);
 
-	  		u_crv.vertices.push(u_pt);
-        v_crv.vertices.push(v_pt);
+	  		if (this.display < 2)    u_crv.vertices.push(u_pt);
+        if (this.display !== 1)  v_crv.vertices.push(v_pt);
 	  	}
 
       let material = (u === 0 || u === 1) ? boundaryMaterial : interiorMaterial;
@@ -464,6 +469,12 @@ class Surface {
         if (k === "v1" && pt === "v3") this[k].__bez[pt] = this.u1.__bez.v3;
       });
     });
+  }
+
+  nextDisplay() {
+    this.display += 1;
+    this.display = this.display % 3;
+    this.update();
   }
 }
 
