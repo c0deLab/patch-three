@@ -93,12 +93,17 @@ export default class CanvasView extends Component {
 	}
 
 	checkLastInteraction() {
+
+		const timeout = 25 * 1000; // 25 seconds
+
 		const t = new Date();
-		if (t - this.state.lastInteraction > 10000) this.surface.randomizeCloseToOriginal(240, (t) => {
+
+		if (t - this.state.lastInteraction > timeout) this.surface.randomizeCloseToOriginal(500, (t) => {
 			this.rotateCameraXY(1.5 * easing.dEase(t));
 			this.draw();
 		});
-		setTimeout(this.checkLastInteraction, 10000);
+
+		setTimeout(this.checkLastInteraction, timeout);
 	}
 
 	updateLastInteraction(cb) {
@@ -126,6 +131,7 @@ export default class CanvasView extends Component {
 
 	onClick(e) {
 		this.updateLastInteraction();
+		this.surface.stop();
 		this.surface.randomize(60, this.draw);
 	}
 
@@ -159,6 +165,9 @@ export default class CanvasView extends Component {
 			}
 
 		} else if (action === "X_AXIS" || action === "Y_AXIS" || action === "Z_AXIS") {
+
+			this.surface.stop();
+
 			switch (action) {
 				case "X_AXIS": 
 					this.surface.setAxis("x");
@@ -174,6 +183,7 @@ export default class CanvasView extends Component {
 
 			this.surface.update();
 		} else if (action === "RESTORE") {
+			this.surface.stop();
 			this.restoreSurface();
 		} else if (action === "DISPLAY") {
 			this.surface.nextDisplay();
@@ -238,13 +248,13 @@ export default class CanvasView extends Component {
 	toggle(delta) {
 		if (Math.abs(delta) < 10) return;
 		this.surface.setActiveControlPointIndex(delta > 0 ? 1 : -1);
-		this.setState({ coordinates: true });
-		this.positionCoordinates();
+		this.draw();
 	}
 
 	positionCoordinates() {
+
 		// get active control point location in screen space
-		// to decide where to show NumericControls
+		// to decide where to show Coordinates
 		let pt = this.surface.getActiveControlPoint();
 		if (_.isNil(pt)) return;
 

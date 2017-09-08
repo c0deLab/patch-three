@@ -332,7 +332,7 @@ class Surface {
     if (this.activeControlPoint > -1) this.positionAxes(this.getActiveControlPoint());
 
     if (t < duration && cb) {
-      window.requestAnimationFrame(() => {
+      this.animationFrame = window.requestAnimationFrame(() => {
         cb(t / duration);
         this.step(t + 1, duration, cb);
       });
@@ -475,6 +475,10 @@ class Surface {
     this.display += 1;
     this.display = this.display % 3;
     this.update();
+  }
+
+  stop() {
+    window.cancelAnimationFrame(this.animationFrame);
   }
 }
 
