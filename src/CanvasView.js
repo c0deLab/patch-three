@@ -4,6 +4,7 @@ import _ from 'lodash';
 
 import Surface from './Surface';
 import Coordinates from './Coordinates';
+import Tutorial from './Tutorial';
 
 import { axisX, axisY, axisZ } from './utils/canvas-helpers';
 import easing from './utils/easing';
@@ -32,6 +33,7 @@ export default class CanvasView extends Component {
 			i: 0,
 			coordinates: false,
 			lastInteraction: new Date(),
+			tutorial: -1, // stage of tutorial (-1 for not active)
 		};
 
 		this.surface = new Surface();
@@ -44,20 +46,23 @@ export default class CanvasView extends Component {
 			X_AXIS: this.updateControlPoint.bind(this, "x"),
 			Y_AXIS: this.updateControlPoint.bind(this, "y"),
 			Z_AXIS: this.updateControlPoint.bind(this, "z"),
+			TUTORIAL: this.tutorial.bind(this, this.state.tutorial + 1)
 		};
 
 		this.keys = { 
-			37: "←→",			// left
-			39: "←→",			// right
-			38: "↑↓",			// up
-			40: "↑↓",			// down
-			80: "TOGGLE", // p
-			67: "ZOOM", 	// c
-			85: "DISPLAY",// u
-			88: "X_AXIS", // x
-			89: "Y_AXIS", // y
-			90: "Z_AXIS", // z
-			27: "RESTORE",// esc
+			37: "←→",			 // left
+			39: "←→",			 // right
+			38: "↑↓",			 // up
+			40: "↑↓",			 // down
+			80: "TOGGLE",  // p
+			67: "ZOOM", 	 // c
+			85: "DISPLAY", // u
+			88: "X_AXIS",  // x
+			89: "Y_AXIS",  // y
+			90: "Z_AXIS",  // z
+			27: "RESTORE", // esc,
+			84: "TUTORIAL",// t
+			77: "MORPH",	 // m
 		};
 
 		/**
@@ -81,6 +86,7 @@ export default class CanvasView extends Component {
 		this.updateControlPoint = this.updateControlPoint.bind(this);
 		this.positionCamera = this.positionCamera.bind(this);
 		this.restoreSurface = this.restoreSurface.bind(this);
+		this.tutorial = this.tutorial.bind(this);
 	}
 
 	/**
@@ -98,10 +104,12 @@ export default class CanvasView extends Component {
 
 		const t = new Date();
 
-		if (t - this.state.lastInteraction > timeout) this.surface.randomizeCloseToOriginal(500, (t) => {
-			this.rotateCameraXY(1.5 * easing.dEase(t));
-			this.draw();
-		});
+		if (t - this.state.lastInteraction > timeout && this.state.tutorial < 0) {
+			this.surface.randomizeCloseToOriginal(500, (t) => {
+				this.rotateCameraXY(1.5 * easing.dEase(t));
+				this.draw();
+			});
+		}
 
 		setTimeout(this.checkLastInteraction, timeout);
 	}
@@ -145,13 +153,24 @@ export default class CanvasView extends Component {
 
 		let action = this.keys[code];
 
-		if (action === this.state.action) action = null;
+		if (action === this.state.action && action !== "TUTORIAL") action = null;
+
+		if (action !== "TUTORIAL") {
+			this.setState({ tutorial: -1 });
+		} else {
+			this.tutorial(this.state.tutorial + 1);
+			return;
+		}
 
 		if (_.isFunction(this.actions[action]) || action === null) this.setState({ action });
 
 		// some keys should trigger changes by themselves,
 		// not just setting the action for the wheel to handle
-		if (action === "TOGGLE") {
+		if (action === "MORPH") {
+
+			this.onClick.call(this);
+
+		} else if (action === "TOGGLE") {
 
 			if (!this.surface.controls) {
 
@@ -270,8 +289,8 @@ export default class CanvasView extends Component {
 		const dx = (pt.x < 0 ? -1 :  1) * width  / 2 + (pt.x < 0 ? -1 :  1) * 15;
 		const dy = (pt.y < 0 ?  1 : -1) * height / 2 + (pt.y < 0 ?  1 : -1) * 15;
 
-		pt.x = Math.round(( pt.x + 1) * this.canvas.width / 4) + dx;
-		pt.y = Math.round((-pt.y + 1) * this.canvas.height / 4) + dy;
+		pt.x = Math.round(( pt.x + 1) * this.canvas.width / (2 * window.devicePixelRatio)) + dx;
+		pt.y = Math.round((-pt.y + 1) * this.canvas.height / (2 * window.devicePixelRatio)) + dy;
 
 		// keep it on the screen...
 		// right
@@ -359,9 +378,13 @@ export default class CanvasView extends Component {
 
 		// add event listeners
 		window.addEventListener('resize', this.onResize);
-		this.refs.canvas.addEventListener('click', this.onClick);
-    this.refs.canvas.addEventListener('wheel', this.onWheel.bind(this));
+		window.addEventListener('click', this.onClick);
+    window.addEventListener('wheel', this.onWheel.bind(this));
     window.addEventListener('keydown', this.onKeyDown.bind(this));
+	}
+
+	tutorial(stage) {
+		this.setState({ tutorial: stage });
 	}
 
 	render() {
@@ -389,6 +412,7 @@ export default class CanvasView extends Component {
 					style={coordinatesStyle}
 					active={this.state.coordinates} />
 				<div style={actionStyle}>{this.state.action}</div>
+				<Tutorial step={this.state.tutorial} />
 			</div>
 		)
 	}
