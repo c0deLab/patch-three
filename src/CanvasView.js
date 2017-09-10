@@ -5,6 +5,7 @@ import _ from 'lodash';
 import Surface from './Surface';
 import Coordinates from './Coordinates';
 import Tutorial from './Tutorial';
+import tutorialManager from './tutorial/tutorialManager';
 
 import { axisX, axisY, axisZ } from './utils/canvas-helpers';
 import easing from './utils/easing';
@@ -33,10 +34,12 @@ export default class CanvasView extends Component {
 			i: 0,
 			coordinates: false,
 			lastInteraction: new Date(),
-			tutorial: -1, // stage of tutorial (-1 for not active)
+			tutorial: -1, // stage of tutorial (-1 for not active),
+			lastTutorial: -1
 		};
 
 		this.surface = new Surface();
+		tutorialManager.cv = this;
 
 		this.actions = {
 			TOGGLE: _.throttle(this.toggle.bind(this), 250),
@@ -45,8 +48,7 @@ export default class CanvasView extends Component {
 			ZOOM: this.zoom.bind(this),
 			X_AXIS: this.updateControlPoint.bind(this, "x"),
 			Y_AXIS: this.updateControlPoint.bind(this, "y"),
-			Z_AXIS: this.updateControlPoint.bind(this, "z"),
-			TUTORIAL: this.tutorial.bind(this, this.state.tutorial + 1)
+			Z_AXIS: this.updateControlPoint.bind(this, "z")
 		};
 
 		this.keys = { 
@@ -87,6 +89,8 @@ export default class CanvasView extends Component {
 		this.positionCamera = this.positionCamera.bind(this);
 		this.restoreSurface = this.restoreSurface.bind(this);
 		this.tutorial = this.tutorial.bind(this);
+
+		this.preventKeysExceptTutorial = false;
 	}
 
 	/**
@@ -154,11 +158,18 @@ export default class CanvasView extends Component {
 		let action = this.keys[code];
 
 		if (action === this.state.action && action !== "TUTORIAL") action = null;
+		if (this.preventKeysExceptTutorial && action !== "TUTORIAL") return;
 
 		if (action !== "TUTORIAL") {
-			this.setState({ tutorial: -1 });
+			this.setState({ 
+				lastTutorial: this.state.tutorial >= 0 ? this.state.tutorial : this.state.lastTutorial,
+				tutorial: -1
+			});
 		} else {
-			this.tutorial(this.state.tutorial + 1);
+			let step = this.state.tutorial;
+			if (this.state.lastTutorial >= 0 && this.state.tutorial === -1) step = this.state.lastTutorial;
+			step++;
+			this.tutorial(step);
 			return;
 		}
 
@@ -246,7 +257,7 @@ export default class CanvasView extends Component {
 	}
 
 	rotateCameraXY(delta) {
-		let angle = 0.0008 * delta;
+		let angle = 0.001 * delta;
 		this.azimuth += angle;
 	}
 
@@ -265,7 +276,7 @@ export default class CanvasView extends Component {
 	}
 
 	toggle(delta) {
-		if (Math.abs(delta) < 10) return;
+		if (Math.abs(delta) < 6) return;
 		this.surface.setActiveControlPointIndex(delta > 0 ? 1 : -1);
 		this.draw();
 	}
@@ -337,7 +348,7 @@ export default class CanvasView extends Component {
 	}
 
 	zoom(delta) {
-		const zoomOut = delta < 0;     // boolean
+		const zoomOut = delta > 0;     // boolean
     const factor = zoomOut ? 1.1 : 0.9; // number
     this.camera.zoom *= factor;
     this.camera.updateProjectionMatrix();
@@ -384,7 +395,24 @@ export default class CanvasView extends Component {
 	}
 
 	tutorial(stage) {
-		this.setState({ tutorial: stage });
+
+		// if we're past the final step of the tutorial,
+		// exit
+		if (tutorialManager.steps > 0 && stage >= tutorialManager.steps) {
+			
+			this.setState({ 
+				lastTutorial: -1,
+				tutorial: -1 
+			});
+
+		// otherwise, progress
+		} else {
+
+			this.setState({ 
+				lastTutorial: this.state.tutorial,
+				tutorial: stage 
+			});
+		}
 	}
 
 	render() {
@@ -412,7 +440,7 @@ export default class CanvasView extends Component {
 					style={coordinatesStyle}
 					active={this.state.coordinates} />
 				<div style={actionStyle}>{this.state.action}</div>
-				<Tutorial step={this.state.tutorial} />
+				<Tutorial step={this.state.tutorial} manager={tutorialManager} />
 			</div>
 		)
 	}
