@@ -6,6 +6,8 @@ import Step1 from './tutorial/Step1';
 import Step2 from './tutorial/Step2';
 import Step3 from './tutorial/Step3';
 import Step4 from './tutorial/Step4';
+import Step5 from './tutorial/Step5';
+import Step6 from './tutorial/Step6';
 import Dummy from './tutorial/Dummy';
 
 export default class Tutorial extends Component {
@@ -21,6 +23,10 @@ export default class Tutorial extends Component {
 			<Step3 manager={manager} />,
 			<Dummy manager={manager} hide={true} />,
 			<Step4 manager={manager} />,
+			<Dummy manager={manager} hide={true} />,
+			<Step5 manager={manager} />,
+			<Dummy manager={manager} hide={true} />,
+			<Step6 manager={manager} />,
 			<Dummy manager={manager} hide={true} />
 		];
 
