@@ -65,6 +65,7 @@ export default class CanvasView extends Component {
 			27: "RESTORE", // esc,
 			84: "TUTORIAL",// t
 			77: "MORPH",	 // m
+			79: "ZOOMTOFIT",	// o
 		};
 
 		/**
@@ -89,6 +90,7 @@ export default class CanvasView extends Component {
 		this.positionCamera = this.positionCamera.bind(this);
 		this.restoreSurface = this.restoreSurface.bind(this);
 		this.tutorial = this.tutorial.bind(this);
+		this.zoomToFit = this.zoomToFit.bind(this);
 
 		this.preventKeysExceptTutorial = false;
 	}
@@ -180,6 +182,10 @@ export default class CanvasView extends Component {
 		if (action === "MORPH") {
 
 			this.onClick.call(this);
+
+		} else if (action === "ZOOMTOFIT") {
+
+			this.zoomToFit();
 
 		} else if (action === "TOGGLE") {
 
@@ -349,9 +355,57 @@ export default class CanvasView extends Component {
 
 	zoom(delta) {
 		const zoomOut = delta > 0;     // boolean
-    const factor = zoomOut ? 1.1 : 0.9; // number
-    this.camera.zoom *= factor;
-    this.camera.updateProjectionMatrix();
+		const factor = zoomOut ? 1.1 : 0.9; // number
+		this.camera.zoom *= factor;
+		this.camera.updateProjectionMatrix();
+	}
+
+	// TODO
+	zoomToFit() {
+		
+		// assume that we do NOT need to zoom out...
+		let inView = true;
+
+		// assume that we MIGHT need to zoom in...
+		let closeFit = false;
+		
+		["u0", "u1", "v0", "v1"].forEach((crv) => {
+			
+			const bez = this.surface[crv].__bez;
+			
+			["v0", "v1", "v2", "v3"].forEach((pt) => {
+				
+				// if a control point is out of view of the camera,
+				// then we DO need to zoom out
+				const controlPt = bez[pt].clone();
+				controlPt.project(this.camera);
+
+				let ax = Math.abs(controlPt.x);
+				let ay = Math.abs(controlPt.y);
+
+				if (ax > 1 || ay > 1) inView = false;
+
+				if (Math.abs(ax - 1) < 0.1 || Math.abs(ay - 1) < 0.1) {
+					closeFit = true;
+				}
+			});
+		});
+
+		// possibly zoom in?
+		if (inView) {
+			// if a close fit, we're done
+			if (closeFit) return;
+			// zoom in a bit
+			this.zoom(1);
+		} else {
+			// zoom out a bit
+			this.zoom(-1);
+		}
+
+		window.requestAnimationFrame(() => {
+			this.zoomToFit();
+			this.draw();
+		});
 	}
 
 	componentDidMount() {
@@ -390,8 +444,8 @@ export default class CanvasView extends Component {
 		// add event listeners
 		window.addEventListener('resize', this.onResize);
 		window.addEventListener('click', this.onClick);
-    window.addEventListener('wheel', this.onWheel.bind(this));
-    window.addEventListener('keydown', this.onKeyDown.bind(this));
+		window.addEventListener('wheel', this.onWheel.bind(this));
+		window.addEventListener('keydown', this.onKeyDown.bind(this));
 	}
 
 	tutorial(stage) {
@@ -423,14 +477,6 @@ export default class CanvasView extends Component {
 			top: this.state.coordinatesY,
 		};
 
-		const actionStyle = {
-			left: 20,
-			top: 20,
-			position: 'absolute',
-			color: '#fff',
-			fontFamily: 'monospace'
-		};
-
 		return (
 			<div>
 				<canvas ref="canvas" />
@@ -439,7 +485,7 @@ export default class CanvasView extends Component {
 					surface={this.surface} 
 					style={coordinatesStyle}
 					active={this.state.coordinates} />
-				<div style={actionStyle}>{this.state.action}</div>
+				<div className="action">{this.state.action}</div>
 				<Tutorial step={this.state.tutorial} manager={tutorialManager} />
 			</div>
 		)
