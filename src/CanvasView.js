@@ -52,20 +52,18 @@ export default class CanvasView extends Component {
 		};
 
 		this.keys = { 
-			37: "←→",			 // left
-			39: "←→",			 // right
-			38: "↑↓",			 // up
-			40: "↑↓",			 // down
-			80: "TOGGLE",  // p
-			67: "ZOOM", 	 // c
-			85: "DISPLAY", // u
-			88: "X_AXIS",  // x
-			89: "Y_AXIS",  // y
-			90: "Z_AXIS",  // z
-			27: "RESTORE", // esc,
-			84: "TUTORIAL",// t
-			77: "MORPH",	 // m
-			79: "ZOOMTOFIT",	// o
+			85: "←→",
+			86: "↑↓",
+			73: "TOGGLE",
+			87: "ZOOM",
+			69: "DISPLAY",
+			74: "X_AXIS",
+			75: "Y_AXIS",
+			76: "Z_AXIS",
+			66: "RESTORE",
+			68: "TUTORIAL",
+			65: "MORPH",
+			88: "ZOOMTOFIT",
 		};
 
 		/**
