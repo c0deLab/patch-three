@@ -67,7 +67,6 @@ axisY.visible = false;
 const axisZ = new THREE.Group();
 axisZ.visible = false;
 
-const arrows = new THREE.Group();
 const arrow = new THREE.Mesh(
 	new THREE.ConeGeometry(0.01, 0.05, 8),
 	new THREE.MeshBasicMaterial({ color: 0xffffff })
