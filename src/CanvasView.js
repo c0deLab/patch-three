@@ -61,6 +61,7 @@ export default class CanvasView extends Component {
 			75: "Y_AXIS",
 			76: "Z_AXIS",
 			66: "RESTORE",
+			72: "EXIT",
 			68: "TUTORIAL",
 			65: "MORPH",
 			88: "ZOOMTOFIT",
@@ -160,7 +161,13 @@ export default class CanvasView extends Component {
 		if (action === this.state.action && action !== "TUTORIAL") action = null;
 		if (this.preventKeysExceptTutorial && action !== "TUTORIAL") return;
 
-		if (action !== "TUTORIAL") {
+		if (action === "EXIT") {
+			this.setState({
+				tutorial: -1,
+				lastTutorial: -1,
+				helperText: ""
+			});
+		} if (action !== "TUTORIAL") {
 			this.setState({ 
 				lastTutorial: this.state.tutorial >= 0 ? this.state.tutorial : this.state.lastTutorial,
 				tutorial: -1
@@ -475,6 +482,10 @@ export default class CanvasView extends Component {
 			top: this.state.coordinatesY,
 		};
 
+		const helperText = () => {
+			return { __html: this.state.helperText };
+		};
+
 		return (
 			<div>
 				<canvas ref="canvas" />
@@ -485,6 +496,7 @@ export default class CanvasView extends Component {
 					active={this.state.coordinates} />
 				<div className="action">{this.state.action}</div>
 				<Tutorial step={this.state.tutorial} manager={tutorialManager} />
+				<div className="helper-text" dangerouslySetInnerHTML={helperText()}></div>
 			</div>
 		)
 	}

@@ -19,15 +19,11 @@ export default class Tutorial extends Component {
 		this.steps = [
 			<Step1 manager={manager} />,
 			<Step2 manager={manager} />,
-			<Dummy manager={manager} hide={true} />,
+			<Dummy manager={manager} hide={true} helperText="Press <b>TUT</b> when you&#39;re ready to continue, or <b>EXIT</b> to leave the tutorial." />,
 			<Step3 manager={manager} />,
-			<Dummy manager={manager} hide={true} />,
+			<Dummy manager={manager} hide={true} helperText="Press <b>TUT</b> when you&#39;re ready to continue, or <b>EXIT</b> to leave the tutorial." />,
 			<Step4 manager={manager} />,
-			<Dummy manager={manager} hide={true} />,
-			<Step5 manager={manager} />,
-			<Dummy manager={manager} hide={true} />,
-			<Step6 manager={manager} />,
-			<Dummy manager={manager} hide={true} />
+			<Dummy manager={manager} hide={true} helperText="You are done with the tutorial. Press <b>EXIT</b> to start creating your own “Coons patch”!" />,
 		];
 
 		this.props.manager.steps = this.steps.length;

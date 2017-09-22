@@ -22,7 +22,7 @@ const axisMaterial = new THREE.LineDashedMaterial({
 	linewidth: 1,
 	dashSize: 0.06,
 	gapSize: 0.06,
-	opacity: 0.5,
+	opacity: 0.75,
 	transparent: true
 });
 

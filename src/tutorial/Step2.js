@@ -10,10 +10,9 @@ export default class Step extends Component {
 	render() {
 		return (
 			<div>
-				<h1>Camera: Rotate</h1>
-				<p>You can rotate the camera around the surface by pressing <b>←→</b> on the keypad. You will see the action update in the upper-left corner of the screen.</p>
-				<p>Then, rotate the control knob to move the camera.</p>
-				<p>Press <b>TUT</b> to try it out now, then press <b>TUT</b> again when you're ready to continue.</p>
+				<h1>Automatic transformation: Morphing</h1>
+				<p>First, let’s see the “Coons Patch” in action. In order to transform the surface in a random way, use the <b>MORPH</b> key on the keypad. You can do this as many times as you like. In order to go back to a simple plane, you can press <b>RES</b> at any time.</p>
+				<p>Press <b>TUT</b> on the keypad to try using the <b>MORPH</b> command to automatically change the surface.</p>
 			</div>
 		);
 	}
