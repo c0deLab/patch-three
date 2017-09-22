@@ -162,11 +162,7 @@ export default class CanvasView extends Component {
 		if (this.preventKeysExceptTutorial && action !== "TUTORIAL") return;
 
 		if (action === "EXIT") {
-			this.setState({
-				tutorial: -1,
-				lastTutorial: -1,
-				helperText: ""
-			});
+			window.location.reload(true);
 		} if (action !== "TUTORIAL") {
 			this.setState({ 
 				lastTutorial: this.state.tutorial >= 0 ? this.state.tutorial : this.state.lastTutorial,
