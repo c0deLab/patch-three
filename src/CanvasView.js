@@ -35,7 +35,8 @@ export default class CanvasView extends Component {
 			coordinates: false,
 			lastInteraction: new Date(),
 			tutorial: -1, // stage of tutorial (-1 for not active),
-			lastTutorial: -1
+			lastTutorial: -1,
+			idles: 0,
 		};
 
 		this.surface = new Surface();
@@ -110,13 +111,15 @@ export default class CanvasView extends Component {
 		const t = new Date();
 
 		if (t - this.state.lastInteraction > timeout && this.state.tutorial < 0) {
+			this.setState({ idles: this.state.idles + 1 });
+			this.surface.stop();
 			this.surface.randomizeCloseToOriginal(500, (t) => {
 				this.rotateCameraXY(1.5 * easing.dEase(t));
 				this.draw();
 			});
 		}
 
-		setTimeout(this.checkLastInteraction, timeout);
+		window.setTimeout(this.checkLastInteraction, timeout);
 	}
 
 	updateLastInteraction(cb) {
