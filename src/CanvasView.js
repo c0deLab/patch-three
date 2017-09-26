@@ -112,7 +112,7 @@ export default class CanvasView extends Component {
 
 		if (t - this.state.lastInteraction > timeout && this.state.tutorial < 0) {
 
-			// if greater than 9 idles, to prevent slowing down, reload everything
+			// if 10 or more idles, to prevent slowing down, reload everything
 			if (this.state.idles > 9) window.location.reload(true);
 
 			this.setState({ idles: this.state.idles + 1 });
@@ -215,20 +215,18 @@ export default class CanvasView extends Component {
 
 			this.surface.stop();
 
-			switch (action) {
-				case "X_AXIS": 
-					this.surface.setAxis("x");
-					break;
-				case "Y_AXIS":
-					this.surface.setAxis("y");
-					break;
-				case "Z_AXIS":
-					this.surface.setAxis("z");
-					break;
-				default:
+			let axis = action === "X_AXIS" ? "x" : action === "Y_AXIS" ? "y" : "z";
+
+			this.surface.setAxis(axis);
+			
+			if (!this.surface.controls) {
+				this.surface.activateControls();
+				this.setState({ coordinates: true });
+				this.positionCoordinates();
 			}
 
 			this.surface.update();
+
 		} else if (action === "RESTORE") {
 			this.surface.stop();
 			this.restoreSurface();
