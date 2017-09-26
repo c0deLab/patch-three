@@ -111,8 +111,14 @@ export default class CanvasView extends Component {
 		const t = new Date();
 
 		if (t - this.state.lastInteraction > timeout && this.state.tutorial < 0) {
+
+			// if greater than 9 idles, to prevent slowing down, reload everything
+			if (this.state.idles > 9) window.location.reload(true);
+
 			this.setState({ idles: this.state.idles + 1 });
+
 			this.surface.stop();
+
 			this.surface.randomizeCloseToOriginal(500, (t) => {
 				this.rotateCameraXY(1.5 * easing.dEase(t));
 				this.draw();
@@ -124,7 +130,8 @@ export default class CanvasView extends Component {
 
 	updateLastInteraction(cb) {
 		this.setState({
-			lastInteraction: new Date()
+			lastInteraction: new Date(),
+			idles: 0
 		}, cb);
 	}
 
