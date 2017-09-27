@@ -439,6 +439,7 @@ export default class CanvasView extends Component {
 		this.onResize();
 
 		this.surface.setScene(this.scene);
+		this.surface.init();
 		this.surface.update();
 		
 		// even though .draw() calls .positionCamera(), for some reason if we don't

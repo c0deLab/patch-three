@@ -52,6 +52,8 @@ class Surface {
     this.v0 = v0;
     this.v1 = v1;
 
+    this.stepSize = 0.04;
+
     this.controlPointsList = [
       ["v0", "v0", 3],
       ["v0", "v1", 2],
@@ -72,6 +74,11 @@ class Surface {
 
     this.controls = false;
     this.axis = null;
+
+    this.u_crvs = [];
+    this.v_crvs = [];
+    this.controlLine = null;
+    this.controlPt = null;
 
     // 0 = show both U and V
     // 1 = show just U
@@ -172,29 +179,84 @@ class Surface {
 
   addControlPt(pt) {
 
-    const isActive = this.controlPointsList.indexOf(pt) === this.activeControlPoint;
-
     // pt an array from this.controlPointsList,
     // index 0 = curve name
     // index 1 = vertex name
     // index 2 = size of sphere
     const crv = this[pt[0]];
     const v = crv.__bez[pt[1]];
-    const size = pt[2] * (isActive ? 1.5 : 1);
+    const size = pt[2];
 
     const d = 0.006 * size;
 
-    const controlPtGeo = new THREE.SphereGeometry(d, 8, 8); // BoxGeometry(d, d, d);
-    const controlPt = new THREE.Mesh(controlPtGeo, isActive ? activeControlPointMaterial : controlPtMaterial);
+    const controlPtGeo = new THREE.SphereGeometry(d, 8, 8);
+    const controlPt = new THREE.Mesh(controlPtGeo, controlPtMaterial);
     controlPt.position.set(v.x, v.y, v.z);
+    controlPt.name = "control-pt-" + pt[0] + "-" + pt[1];
+    controlPt.visible = false;
     this.scene.add(controlPt);
   }
 
-  addControlLine(v1, v2) {
+  positionControlPt(pt) {
+    
+    const isActive = this.controlPointsList.indexOf(pt) === this.activeControlPoint;
+    
+    const name = "control-pt-" + pt[0] + "-" + pt[1];
+    const controlPt = this.scene.getObjectByName(name);
+
+    if (!this.controls) {
+      controlPt.visible = false;
+      return;
+    }
+
+    controlPt.visible = true;
+    
+    const crv = this[pt[0]];
+    const v = crv.__bez[pt[1]];
+
+    controlPt.position.set(v.x, v.y, v.z);
+    
+    if (isActive) {
+      controlPt.scale.set(1.6, 1.6, 1.6);
+      controlPt.material = activeControlPointMaterial;
+    } else {
+      controlPt.scale.set(1, 1, 1);
+      controlPt.material = controlPtMaterial;
+    }
+  }
+
+  addControlLine(crv_1, pt_1, crv_2, pt_2) {
+
+    const v1 = this[crv_1].__bez[pt_1];
+    const v2 = this[crv_2].__bez[pt_2];
+
     const lineGeo = new THREE.Geometry();
     lineGeo.vertices.push(v1, v2);
     lineGeo.computeLineDistances();
-    this.scene.add(new THREE.Line(lineGeo, controlMaterial));
+    
+    const lineMesh = new THREE.Line(lineGeo, controlMaterial);
+    lineMesh.visible = false;
+    lineMesh.name = crv_1 + "-" + pt_1 + "-" + crv_2 + "-" + pt_2;
+    this.scene.add(lineMesh);
+  }
+
+  positionControlLine(crv_1, pt_1, crv_2, pt_2) {
+    
+    const v1 = this[crv_1].__bez[pt_1];
+    const v2 = this[crv_2].__bez[pt_2];
+    const line = this.scene.getObjectByName(crv_1 + "-" + pt_1 + "-" + crv_2 + "-" + pt_2);
+
+    if (!this.controls) {
+      line.visible = false;
+      return;
+    }
+
+    line.visible = true;
+
+    line.geometry.verticesNeedUpdate = true;
+    
+    line.geometry.vertices[0].set(v1.x, v1.y, v1.z);
+    line.geometry.vertices[1].set(v2.x, v2.y, v2.z);
   }
 
   positionAxes(pt) {
@@ -207,56 +269,68 @@ class Surface {
   setScene(scene) { this.scene = scene; }
 
   setAxis(axis) { this.axis = axis; }
-  
-  update() {
 
-  	// tear down all existing scene objects
-    const children = this.scene.children;
-
-    // clean up
-    while (children.length > 0) {
-      
-      const child = children.pop();
-      
-      if (child.type !== "Group") {
-        child.geometry.dispose();
-        child.material.dispose();
-      }
-      
-      this.scene.remove(child);
-    }
+  // call after setting scene
+  init() {
+    
+    // add control points
+    this.controlPointsList.forEach(pt => this.addControlPt(pt));
 
     // add axes, assume they are not being shown
     this.scene.add(axisX);
     this.scene.add(axisY);
     this.scene.add(axisZ);
 
-  	// add interior curves
-  	const step = 0.04;
-
-  	for (let u = 0; u < 1 + step; u += step) {
+    // add interior curves
+    const step = this.stepSize;
+    
+    for (let u = 0; u < 1 + step; u += step) {
 
       if (u > 1) u = 1;
 
-  		let u_crv = new THREE.Geometry();
+      let u_crv = new THREE.Geometry();
       let v_crv = new THREE.Geometry();
-  		
-  		for (let v = 0; v < 1 + step; v += step) {
+      
+      for (let v = 0; v < 1 + step; v += step) {
 
         if (v > 1) v = 1;
 
-	  		let u_pt = this.patch(u, v);
+        let u_pt = this.patch(u, v);
         let v_pt = this.patch(v, u);
 
-	  		if (this.display < 2)    u_crv.vertices.push(u_pt);
+        if (this.display < 2)    u_crv.vertices.push(u_pt);
         if (this.display !== 1)  v_crv.vertices.push(v_pt);
-	  	}
+      }
 
-      let material = (u === 0 || u === 1) ? boundaryMaterial : interiorMaterial;
+      const material = (u === 0 || u === 1) ? boundaryMaterial : interiorMaterial;
 
-  		this.scene.add(new THREE.Line(u_crv, material));
-      this.scene.add(new THREE.Line(v_crv, material));
-  	}
+      const u_line = new THREE.Line(u_crv, material);
+      const v_line = new THREE.Line(v_crv, material);
+
+      this.u_crvs.push(u_line);
+      this.v_crvs.push(v_line);
+
+      this.scene.add(u_line);
+      this.scene.add(v_line);
+    }
+
+    this.addControlLine("v0", "v0", "v0", "v1");
+    this.addControlLine("v0", "v0", "u0", "v1");
+
+    this.addControlLine("v0", "v3", "v0", "v2");
+    this.addControlLine("v0", "v3", "u1", "v1");
+    
+    this.addControlLine("v1", "v0", "v1", "v1");
+    this.addControlLine("v1", "v0", "u0", "v2");
+
+    this.addControlLine("v1", "v3", "v1", "v2");
+    this.addControlLine("v1", "v3", "u1", "v2");
+  }
+  
+  update() {
+    
+    // position control points
+    this.controlPointsList.forEach(pt => this.positionControlPt(pt));
 
     axisX.visible = false;
     axisY.visible = false;
@@ -269,22 +343,42 @@ class Surface {
       if (this.axis === "x") axisX.visible = true;
       if (this.axis === "y") axisY.visible = true;
       if (this.axis === "z") axisZ.visible = true;
-
-      // add control points
-      this.controlPointsList.forEach(pt => this.addControlPt(pt));
-
-      this.addControlLine(this.v0.__bez.v0, this.v0.__bez.v1);
-      this.addControlLine(this.v0.__bez.v0, this.u0.__bez.v1);
-
-      this.addControlLine(this.v0.__bez.v3, this.v0.__bez.v2);
-      this.addControlLine(this.v0.__bez.v3, this.u1.__bez.v1);
-
-      this.addControlLine(this.v1.__bez.v0, this.v1.__bez.v1);
-      this.addControlLine(this.v1.__bez.v0, this.u0.__bez.v2);
-
-      this.addControlLine(this.v1.__bez.v3, this.v1.__bez.v2);
-      this.addControlLine(this.v1.__bez.v3, this.u1.__bez.v2);
     }
+
+    // update interior curves
+    const step = this.stepSize;
+
+    this.u_crvs.forEach((crv, i) => {
+      crv.geometry.verticesNeedUpdate = true;
+      crv.geometry.vertices.forEach((pt, j) => {
+        const u = j * step;
+        const v = i * step;
+        const s = this.patch(v, u);
+        pt.set(s.x, s.y, s.z);
+      });
+    });
+
+    this.v_crvs.forEach((crv, i) => {
+      crv.geometry.verticesNeedUpdate = true;
+      crv.geometry.vertices.forEach((pt, j) => {
+        const u = j * step;
+        const v = i * step;
+        const s = this.patch(u, v);
+        pt.set(s.x, s.y, s.z);
+      });
+    });
+    
+    this.positionControlLine("v0", "v0", "v0", "v1");
+    this.positionControlLine("v0", "v0", "u0", "v1");
+
+    this.positionControlLine("v0", "v3", "v0", "v2");
+    this.positionControlLine("v0", "v3", "u1", "v1");
+    
+    this.positionControlLine("v1", "v0", "v1", "v1");
+    this.positionControlLine("v1", "v0", "u0", "v2");
+
+    this.positionControlLine("v1", "v3", "v1", "v2");
+    this.positionControlLine("v1", "v3", "u1", "v2");
   }
 
   /**
@@ -414,7 +508,7 @@ class Surface {
       });
     });
 
-    // now that we our dx, dy, dz, step toward it
+    // now that we have our dx, dy, dz, step toward it
     this.step(0, duration, cb);
   }
 
