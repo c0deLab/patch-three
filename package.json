@@ -6,7 +6,8 @@
     "lodash": "^4.17.5",
     "react": "^16.2.0",
     "react-dom": "^16.2.0",
-    "three": "^0.89.0"
+    "three": "^0.89.0",
+    "three-orbit-controls": "^82.1.0"
   },
   "devDependencies": {
     "react-scripts": "1.1.0"

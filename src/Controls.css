@@ -1,0 +1,17 @@
+.controls {
+  background: #fff;
+  background: rgba(255, 255, 255, 0.25);
+  left: 15px;
+  padding: 10px;
+  position: absolute;
+  top: 15px;
+}
+
+.controls button {
+  background: #666;
+  border: none;
+  border-radius: 0;
+  color: #eee;
+  cursor: pointer;
+  text-transform: uppercase;
+}

@@ -1,7 +1,7 @@
 const THREE = require('three');
 
 // helper for new vec3
-const p = (x, y, z = 0.5) => new THREE.Vector3(x - 0.5, y - 0.5, z - 0.5);
+const p = (x, z, y = 0.5) => new THREE.Vector3(x - 0.5, y - 0.5, z - 0.5);
 
 const boundaryMaterial = new THREE.LineBasicMaterial({ 
 	color : 0xffffff,

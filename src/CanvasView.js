@@ -1,8 +1,13 @@
+// @flow
+
 import React, { Component } from 'react';
 import ReactDOM from 'react-dom';
+import * as THREE from 'three';
+import OrbitControls from 'three-orbit-controls';
 import _ from 'lodash';
 
 import Surface from './Surface';
+import { Controls, ControlsManager } from './Controls';
 import Coordinates from './Coordinates';
 import Tutorial from './Tutorial';
 import tutorialManager from './tutorial/tutorialManager';
@@ -10,13 +15,64 @@ import tutorialManager from './tutorial/tutorialManager';
 import { axisX, axisY, axisZ } from './utils/canvas-helpers';
 import easing from './utils/easing';
 
-const THREE = require('three');
+type State = {
+	action: null | string,
+	i: number,
+	coordinates: boolean,
+	lastInteraction: Date,
+	tutorial: number,
+	lastTutorial: number,
+	idles: number
+};
 
 /**
  * Responsible for maintaining app state, including the Surface,
  * handling user interactions, and drawing to the screen.
  */
-export default class CanvasView extends Component {
+export default class CanvasView extends Component<{}, State> {
+
+	camera: THREE.PerspectiveCamera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
+	canvas: null | HTMLCanvasElement = null;
+	renderer: THREE.WebGLRenderer = new THREE.WebGLRenderer();
+	scene: THREE.Scene = new THREE.Scene();
+	surface: Surface = new Surface();
+	controlsManager: ControlsManager = new ControlsManager();
+
+	/**
+	 * These two numbers determine camera location.
+	 * Camera is always looking at the origin with z-axis = up.
+	 * See .positionCamera()
+	 */
+	azimuth: number = Math.PI / 8;
+	altitude: number = Math.PI / 4;
+
+	actions: Object = {
+		TOGGLE: _.throttle(this.toggle.bind(this), 250),
+		"←→": this.rotateCameraXY.bind(this),
+		"↑↓": this.rotateCameraZ.bind(this),
+		ZOOM: this.zoom.bind(this),
+		X_AXIS: this.updateControlPoint.bind(this, "x"),
+		Y_AXIS: this.updateControlPoint.bind(this, "y"),
+		Z_AXIS: this.updateControlPoint.bind(this, "z")
+	};
+
+	/**
+	 * Bind class methods that use `this` as calling context.
+	 */
+	iter: Function = this.iter.bind(this);
+	checkLastInteraction: Function = this.checkLastInteraction.bind(this);
+	onResize: Function = _.debounce(this.onResize.bind(this), 250); // debounced because expensive
+	onClick: Function = this.onClick.bind(this);
+	onMove: Function = this.onMove.bind(this);
+	draw: Function = this.draw.bind(this);
+	updateControlPoint: Function = this.updateControlPoint.bind(this);
+	positionCamera: Function = this.positionCamera.bind(this);
+	restoreSurface: Function = this.restoreSurface.bind(this);
+	tutorial: Function = this.tutorial.bind(this);
+	zoomToFit: Function = this.zoomToFit.bind(this);
+	
+	// If true, no keys except `tutorial` will be recognized
+	preventKeysExceptTutorial: boolean = false;
 	
 	constructor() {
 
@@ -24,7 +80,7 @@ export default class CanvasView extends Component {
 
 		/**
 		 * Initial state:
-		 * - no action selected (control knob does nothing)
+		 * - no action selected (wheel does nothing)
 		 * - iteration set to 0
 		 * - coordinates not visible
 		 * - last interaction happened at this precise moment
@@ -39,60 +95,7 @@ export default class CanvasView extends Component {
 			idles: 0,
 		};
 
-		this.surface = new Surface();
 		tutorialManager.cv = this;
-
-		this.actions = {
-			TOGGLE: _.throttle(this.toggle.bind(this), 250),
-			"←→": this.rotateCameraXY.bind(this),
-			"↑↓": this.rotateCameraZ.bind(this),
-			ZOOM: this.zoom.bind(this),
-			X_AXIS: this.updateControlPoint.bind(this, "x"),
-			Y_AXIS: this.updateControlPoint.bind(this, "y"),
-			Z_AXIS: this.updateControlPoint.bind(this, "z")
-		};
-
-		this.keys = { 
-			85: "←→",
-			86: "↑↓",
-			73: "TOGGLE",
-			87: "ZOOM",
-			69: "DISPLAY",
-			74: "X_AXIS",
-			75: "Y_AXIS",
-			76: "Z_AXIS",
-			66: "RESTORE",
-			72: "EXIT",
-			68: "TUTORIAL",
-			65: "MORPH",
-			88: "ZOOMTOFIT",
-		};
-
-		/**
-		 * These two numbers determine camera location.
-		 * Camera is always looking at the origin with z-axis = up.
-		 * See .positionCamera()
-		 */
-		this.azimuth = Math.PI / 8;
-		this.altitude = Math.PI / 4;
-
-		/**
-		 * Bind class methods that use `this` as calling context.
-		 */
-		this.iter = this.iter.bind(this);
-		this.checkLastInteraction = this.checkLastInteraction.bind(this);
-		this.onResize = _.debounce(this.onResize.bind(this), 250); // debounced because expensive
-		this.onClick = this.onClick.bind(this);
-		this.onWheel = this.onWheel.bind(this);
-		this.onKeyDown = this.onKeyDown.bind(this);
-		this.draw = this.draw.bind(this);
-		this.updateControlPoint = this.updateControlPoint.bind(this);
-		this.positionCamera = this.positionCamera.bind(this);
-		this.restoreSurface = this.restoreSurface.bind(this);
-		this.tutorial = this.tutorial.bind(this);
-		this.zoomToFit = this.zoomToFit.bind(this);
-
-		this.preventKeysExceptTutorial = false;
 	}
 
 	/**
@@ -128,7 +131,7 @@ export default class CanvasView extends Component {
 		window.setTimeout(this.checkLastInteraction, timeout);
 	}
 
-	updateLastInteraction(cb) {
+	updateLastInteraction(cb: Function = _.noop) {
 		this.setState({
 			lastInteraction: new Date(),
 			idles: 0
@@ -140,122 +143,33 @@ export default class CanvasView extends Component {
 		this.updateLastInteraction();
 
 		const canvas = this.canvas;
+		const renderer = this.renderer;
+		if (canvas === null || renderer === null) return;
 
 		canvas.width = window.innerWidth;
 		canvas.height = window.innerHeight;
 
 		this.camera.aspect = canvas.width / canvas.height;
 		this.camera.updateProjectionMatrix();
-		this.renderer.setSize( canvas.width, canvas.height );
-		this.renderer.render(this.scene, this.camera);
+		renderer.setSize( canvas.width, canvas.height );
+		renderer.render(this.scene, this.camera);
 
 		this.positionCoordinates();
 	}
 
-	onClick(e) {
+	onClick() {
 		this.updateLastInteraction();
 		this.surface.stop();
 		this.surface.randomize(60, this.draw);
 	}
 
-	onKeyDown(e) {
-
-		this.updateLastInteraction();
-
-		const code = e.keyCode;
-
-		if (!(code in this.keys)) return;
-
-		let action = this.keys[code];
-
-		if (action === this.state.action && action !== "TUTORIAL") action = null;
-		if (this.preventKeysExceptTutorial && action !== "TUTORIAL") return;
-
-		if (action === "EXIT") {
-			window.location.reload(true);
-		} if (action !== "TUTORIAL") {
-			this.setState({ 
-				lastTutorial: this.state.tutorial >= 0 ? this.state.tutorial : this.state.lastTutorial,
-				tutorial: -1
-			});
-		} else {
-			let step = this.state.tutorial;
-			if (this.state.lastTutorial >= 0 && this.state.tutorial === -1) step = this.state.lastTutorial;
-			step++;
-			this.tutorial(step);
-			return;
-		}
-
-		if (_.isFunction(this.actions[action]) || action === null) this.setState({ action });
-
-		// some keys should trigger changes by themselves,
-		// not just setting the action for the wheel to handle
-		if (action === "MORPH") {
-
-			this.onClick.call(this);
-
-		} else if (action === "ZOOMTOFIT") {
-
-			this.zoomToFit();
-
-		} else if (action === "TOGGLE") {
-
-			if (!this.surface.controls) {
-
-				this.surface.activateControls();
-
-				this.setState({ coordinates: true });
-				this.positionCoordinates();
-			} else {
-				this.surface.setAxis(null);
-				this.surface.update();
-			}
-
-		} else if (action === "X_AXIS" || action === "Y_AXIS" || action === "Z_AXIS") {
-
-			this.surface.stop();
-
-			let axis = action === "X_AXIS" ? "x" : action === "Y_AXIS" ? "y" : "z";
-
-			this.surface.setAxis(axis);
-			
-			if (!this.surface.controls) {
-				this.surface.activateControls();
-				this.setState({ coordinates: true });
-				this.positionCoordinates();
-			}
-
-			this.surface.update();
-
-		} else if (action === "RESTORE") {
-			this.surface.stop();
-			this.restoreSurface();
-		} else if (action === "DISPLAY") {
-			this.surface.nextDisplay();
-		} else {
-			this.setState({ coordinates: false });
-			this.surface.deactivateControls();
-		}
-
-		this.draw();
-	}
-
-	onWheel(e) {
-
-		e.preventDefault();
-
-		this.updateLastInteraction();
-
-		const action = this.state.action;
-
-		if (!(action in this.actions)) return;
-
-		this.actions[action](-e.deltaY);
-
+	onMove() {
 		this.draw();
 	}
 
 	draw() {
+
+		console.log(this.camera.up);
 
 		// a little messy, but this.surface removes all children
 		// from the scene when this.surface.update() is called...
@@ -265,7 +179,7 @@ export default class CanvasView extends Component {
 		this.scene.add(axisY);
 		this.scene.add(axisZ);
 
-		this.positionCamera();
+		// this.positionCamera();
 		this.positionCoordinates();
 
 		this.renderer.render(this.scene, this.camera);
@@ -287,6 +201,8 @@ export default class CanvasView extends Component {
 	}
 
 	restoreSurface() {
+		this.updateLastInteraction();
+		this.surface.stop();
 		this.surface.restore(60, this.draw);
 	}
 
@@ -357,7 +273,7 @@ export default class CanvasView extends Component {
 		this.camera.position.set(x, y, z);
 		this.camera.lookAt(new THREE.Vector3(0, 0, 0));
 
-		this.camera.up = new THREE.Vector3(0, 0, 1);
+		// this.camera.up = new THREE.Vector3(0, 0, 1);
 
 		this.camera.updateProjectionMatrix();
 	}
@@ -421,20 +337,31 @@ export default class CanvasView extends Component {
 
 		// set up canvas
 		const canvas = this.refs.canvas;
-		this.canvas = canvas;
-
-		// set up scene, camera, renderer
-		this.scene = new THREE.Scene();
 		
-		this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
+		const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
 
-		this.renderer = new THREE.WebGLRenderer({
+		const renderer = new THREE.WebGLRenderer({
 			canvas: this.refs.canvas,
 			antialias: true
 		});
 
-		this.renderer.setPixelRatio( window.devicePixelRatio );
-		this.renderer.setSize( window.innerWidth, window.innerHeight );
+		const ThreeOrbitControls = OrbitControls(THREE);
+		const controls = new ThreeOrbitControls( camera, canvas );
+		controls.mouseButtons = {
+			ORBIT: THREE.MOUSE.LEFT,
+			PAN: THREE.MOUSE.RIGHT
+		};
+	
+		controls.maxPolarAngle = Math.PI / 2;
+		controls.maxDistance = 8000;
+		controls.damping = 0.5;
+
+		renderer.setPixelRatio( window.devicePixelRatio );
+		renderer.setSize( window.innerWidth, window.innerHeight );
+
+		this.canvas = canvas;
+		this.camera = camera;
+		this.renderer = renderer;
 		
 		this.onResize();
 
@@ -453,12 +380,15 @@ export default class CanvasView extends Component {
 
 		// add event listeners
 		window.addEventListener('resize', this.onResize);
-		window.addEventListener('click', this.onClick);
-		window.addEventListener('wheel', this.onWheel.bind(this));
-		window.addEventListener('keydown', this.onKeyDown.bind(this));
+		
+		this.controlsManager.on('morph', this.onClick);
+		this.controlsManager.on('restore', () => {
+			this.surface.stop();
+			this.restoreSurface();
+		});
 	}
 
-	tutorial(stage) {
+	tutorial(stage: number) {
 
 		// if we're past the final step of the tutorial,
 		// exit
@@ -492,9 +422,9 @@ export default class CanvasView extends Component {
 		};
 
 		return (
-			<div>
+			<div onMouseMove={this.onMove}>
 				<canvas ref="canvas" />
-				<Coordinates 
+				{/* <Coordinates 
 					ref="Coordinates"
 					surface={this.surface} 
 					style={coordinatesStyle}
@@ -502,6 +432,7 @@ export default class CanvasView extends Component {
 				<div className="action">{this.state.action}</div>
 				<Tutorial step={this.state.tutorial} manager={tutorialManager} />
 				<div className="helper-text" dangerouslySetInnerHTML={helperText()}></div>
+				<Controls manager={this.controlsManager} /> */}
 			</div>
 		)
 	}
