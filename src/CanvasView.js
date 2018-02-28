@@ -19,7 +19,6 @@ type State = {
 	action: null | string,
 	i: number,
 	coordinates: boolean,
-	lastInteraction: Date,
 	tutorial: number,
 	lastTutorial: number,
 	idles: number
@@ -37,39 +36,6 @@ export default class CanvasView extends Component<{}, State> {
 	scene: THREE.Scene = new THREE.Scene();
 	surface: Surface = new Surface();
 	controlsManager: ControlsManager = new ControlsManager();
-
-	/**
-	 * These two numbers determine camera location.
-	 * Camera is always looking at the origin with z-axis = up.
-	 * See .positionCamera()
-	 */
-	azimuth: number = Math.PI / 8;
-	altitude: number = Math.PI / 4;
-
-	actions: Object = {
-		TOGGLE: _.throttle(this.toggle.bind(this), 250),
-		"←→": this.rotateCameraXY.bind(this),
-		"↑↓": this.rotateCameraZ.bind(this),
-		ZOOM: this.zoom.bind(this),
-		X_AXIS: this.updateControlPoint.bind(this, "x"),
-		Y_AXIS: this.updateControlPoint.bind(this, "y"),
-		Z_AXIS: this.updateControlPoint.bind(this, "z")
-	};
-
-	/**
-	 * Bind class methods that use `this` as calling context.
-	 */
-	iter: Function = this.iter.bind(this);
-	checkLastInteraction: Function = this.checkLastInteraction.bind(this);
-	onResize: Function = _.debounce(this.onResize.bind(this), 250); // debounced because expensive
-	onClick: Function = this.onClick.bind(this);
-	onMove: Function = this.onMove.bind(this);
-	draw: Function = this.draw.bind(this);
-	updateControlPoint: Function = this.updateControlPoint.bind(this);
-	positionCamera: Function = this.positionCamera.bind(this);
-	restoreSurface: Function = this.restoreSurface.bind(this);
-	tutorial: Function = this.tutorial.bind(this);
-	zoomToFit: Function = this.zoomToFit.bind(this);
 	
 	// If true, no keys except `tutorial` will be recognized
 	preventKeysExceptTutorial: boolean = false;
@@ -83,13 +49,11 @@ export default class CanvasView extends Component<{}, State> {
 		 * - no action selected (wheel does nothing)
 		 * - iteration set to 0
 		 * - coordinates not visible
-		 * - last interaction happened at this precise moment
 		 */
 		this.state = {
 			action: null,
 			i: 0,
 			coordinates: false,
-			lastInteraction: new Date(),
 			tutorial: -1, // stage of tutorial (-1 for not active),
 			lastTutorial: -1,
 			idles: 0,
@@ -103,44 +67,11 @@ export default class CanvasView extends Component<{}, State> {
 	 * Useful in that it triggers .render()
 	 * without any other side effects.
 	 */
-	iter() {
+	iter: Function = () => {
 		this.setState({ i: this.state.i + 1 });
 	}
 
-	checkLastInteraction() {
-
-		const timeout = 25 * 1000; // 25 seconds
-
-		const t = new Date();
-
-		if (t - this.state.lastInteraction > timeout && this.state.tutorial < 0) {
-
-			// if 10 or more idles, to prevent slowing down, reload everything
-			if (this.state.idles > 9) window.location.reload(true);
-
-			this.setState({ idles: this.state.idles + 1 });
-
-			this.surface.stop();
-
-			this.surface.randomizeCloseToOriginal(500, (t) => {
-				this.rotateCameraXY(1.5 * easing.dEase(t));
-				this.draw();
-			});
-		}
-
-		window.setTimeout(this.checkLastInteraction, timeout);
-	}
-
-	updateLastInteraction(cb: Function = _.noop) {
-		this.setState({
-			lastInteraction: new Date(),
-			idles: 0
-		}, cb);
-	}
-
-	onResize() {
-
-		this.updateLastInteraction();
+	onResize: Function = () => {
 
 		const canvas = this.canvas;
 		const renderer = this.renderer;
@@ -157,19 +88,16 @@ export default class CanvasView extends Component<{}, State> {
 		this.positionCoordinates();
 	}
 
-	onClick() {
-		this.updateLastInteraction();
+	onClick: Function = () => {
 		this.surface.stop();
 		this.surface.randomize(60, this.draw);
 	}
 
-	onMove() {
+	onMove: Function = () => {
 		this.draw();
 	}
 
-	draw() {
-
-		console.log(this.camera.up);
+	draw: Function = () => {
 
 		// a little messy, but this.surface removes all children
 		// from the scene when this.surface.update() is called...
@@ -179,40 +107,23 @@ export default class CanvasView extends Component<{}, State> {
 		this.scene.add(axisY);
 		this.scene.add(axisZ);
 
-		// this.positionCamera();
 		this.positionCoordinates();
 
 		this.renderer.render(this.scene, this.camera);
 	}
 
-	rotateCameraXY(delta) {
-		let angle = 0.001 * delta;
-		this.azimuth += angle;
-	}
-
-	rotateCameraZ(delta) {
-		let angle = 0.0008 * delta;
-		this.altitude += angle;
-
-		// for max altitude = PI / 2, looking straight down
-		// for min altitude = -PI / 2, looking straight up
-		// (higher or lower is not allowed)
-		this.altitude = _.clamp(this.altitude, -Math.PI / 2, Math.PI / 2);
-	}
-
-	restoreSurface() {
-		this.updateLastInteraction();
+	restoreSurface: Function = () => {
 		this.surface.stop();
 		this.surface.restore(60, this.draw);
 	}
 
-	toggle(delta) {
+	toggle: Function = (delta: number) => {
 		if (Math.abs(delta) < 6) return;
 		this.surface.setActiveControlPointIndex(delta > 0 ? 1 : -1);
 		this.draw();
 	}
 
-	positionCoordinates() {
+	positionCoordinates: Function = () => {
 
 		// get active control point location in screen space
 		// to decide where to show Coordinates
@@ -250,7 +161,7 @@ export default class CanvasView extends Component<{}, State> {
 		});
 	}
 
-	updateControlPoint(axis, delta) {
+	updateControlPoint: Function = (axis, delta) => {
 
 		const p = this.surface.getActiveControlPoint();
 		if (_.isNil(p)) return;
@@ -264,29 +175,8 @@ export default class CanvasView extends Component<{}, State> {
 		this.draw();
 	}
 
-	positionCamera() {
-
-		let x = 2 * Math.cos(this.azimuth) * Math.cos(this.altitude);
-		let y = 2 * Math.sin(this.azimuth) * Math.cos(this.altitude);
-		let z = 2 * Math.sin(this.altitude);
-
-		this.camera.position.set(x, y, z);
-		this.camera.lookAt(new THREE.Vector3(0, 0, 0));
-
-		// this.camera.up = new THREE.Vector3(0, 0, 1);
-
-		this.camera.updateProjectionMatrix();
-	}
-
-	zoom(delta) {
-		const zoomOut = delta > 0;     // boolean
-		const factor = zoomOut ? 1.1 : 0.9; // number
-		this.camera.zoom *= factor;
-		this.camera.updateProjectionMatrix();
-	}
-
 	// TODO
-	zoomToFit() {
+	zoomToFit: Function = () => {
 		
 		// assume that we do NOT need to zoom out...
 		let inView = true;
@@ -340,6 +230,8 @@ export default class CanvasView extends Component<{}, State> {
 		
 		const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
 
+		camera.position.set(0.7, 1, 1.2);
+
 		const renderer = new THREE.WebGLRenderer({
 			canvas: this.refs.canvas,
 			antialias: true
@@ -347,6 +239,7 @@ export default class CanvasView extends Component<{}, State> {
 
 		const ThreeOrbitControls = OrbitControls(THREE);
 		const controls = new ThreeOrbitControls( camera, canvas );
+
 		controls.mouseButtons = {
 			ORBIT: THREE.MOUSE.LEFT,
 			PAN: THREE.MOUSE.RIGHT
@@ -354,7 +247,9 @@ export default class CanvasView extends Component<{}, State> {
 	
 		controls.maxPolarAngle = Math.PI / 2;
 		controls.maxDistance = 8000;
-		controls.damping = 0.5;
+		controls.damping = 0.5;	
+		
+		controls.addEventListener('change', this.draw);
 
 		renderer.setPixelRatio( window.devicePixelRatio );
 		renderer.setSize( window.innerWidth, window.innerHeight );
@@ -368,15 +263,8 @@ export default class CanvasView extends Component<{}, State> {
 		this.surface.setScene(this.scene);
 		this.surface.init();
 		this.surface.update();
-		
-		// even though .draw() calls .positionCamera(), for some reason if we don't
-		// call it here, camera is messed up at beginning
-		// TODO: probably should figure this out :-|
-		this.positionCamera();
 
 		this.draw();
-
-		this.checkLastInteraction();
 
 		// add event listeners
 		window.addEventListener('resize', this.onResize);
@@ -388,7 +276,7 @@ export default class CanvasView extends Component<{}, State> {
 		});
 	}
 
-	tutorial(stage: number) {
+	tutorial: Function = (stage: number) => {
 
 		// if we're past the final step of the tutorial,
 		// exit
@@ -422,17 +310,15 @@ export default class CanvasView extends Component<{}, State> {
 		};
 
 		return (
-			<div onMouseMove={this.onMove}>
+			<div>
 				<canvas ref="canvas" />
-				{/* <Coordinates 
+				<Coordinates 
 					ref="Coordinates"
 					surface={this.surface} 
 					style={coordinatesStyle}
 					active={this.state.coordinates} />
-				<div className="action">{this.state.action}</div>
-				<Tutorial step={this.state.tutorial} manager={tutorialManager} />
 				<div className="helper-text" dangerouslySetInnerHTML={helperText()}></div>
-				<Controls manager={this.controlsManager} /> */}
+				<Controls manager={this.controlsManager} />
 			</div>
 		)
 	}

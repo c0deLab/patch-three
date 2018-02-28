@@ -232,9 +232,9 @@ class Surface {
 
     const lineGeo = new THREE.Geometry();
     lineGeo.vertices.push(v1, v2);
-    lineGeo.computeLineDistances();
     
     const lineMesh = new THREE.Line(lineGeo, controlMaterial);
+    lineMesh.computeLineDistances();
     lineMesh.visible = false;
     lineMesh.name = crv_1 + "-" + pt_1 + "-" + crv_2 + "-" + pt_2;
     this.scene.add(lineMesh);
