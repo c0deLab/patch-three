@@ -19,6 +19,8 @@ type State = {
 	action: null | string,
 	i: number,
 	coordinates: boolean,
+	coordinatesX: number,
+	coordinatesY: number,
 	tutorial: number,
 	lastTutorial: number,
 	idles: number
@@ -30,16 +32,20 @@ type State = {
  */
 export default class CanvasView extends Component<{}, State> {
 
+  originalActiveControlPoint: THREE.Vector3;
+  activeControlPoint: null | THREE.Object3D = null;
 	camera: THREE.PerspectiveCamera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
-	canvas: null | HTMLCanvasElement = null;
-	renderer: THREE.WebGLRenderer = new THREE.WebGLRenderer();
+  canvas: HTMLCanvasElement;
+  raycaster: THREE.Raycaster = new THREE.Raycaster();
+  renderer: THREE.WebGLRenderer = new THREE.WebGLRenderer();
+  mouse: THREE.Vector2 = new THREE.Vector2();
 	scene: THREE.Scene = new THREE.Scene();
 	surface: Surface = new Surface();
 	controlsManager: ControlsManager = new ControlsManager();
-	
+
 	// If true, no keys except `tutorial` will be recognized
 	preventKeysExceptTutorial: boolean = false;
-	
+
 	constructor() {
 
 		super();
@@ -54,6 +60,8 @@ export default class CanvasView extends Component<{}, State> {
 			action: null,
 			i: 0,
 			coordinates: false,
+			coordinatesX: -1,
+			coordinatesY: -1,
 			tutorial: -1, // stage of tutorial (-1 for not active),
 			lastTutorial: -1,
 			idles: 0,
@@ -85,16 +93,119 @@ export default class CanvasView extends Component<{}, State> {
 		renderer.setSize( canvas.width, canvas.height );
 		renderer.render(this.scene, this.camera);
 
-		this.positionCoordinates();
+		// this.positionCoordinates();
 	}
 
 	onClick: Function = () => {
 		this.surface.stop();
 		this.surface.randomize(60, this.draw);
+  }
+
+  onMouseDown: Function = (e: MouseEvent) => {
+
+    const w = this.canvas.width / window.devicePixelRatio;
+    const h = this.canvas.height / window.devicePixelRatio;
+    this.mouse.x = ( e.clientX / w ) * 2 - 1;
+    this.mouse.y = -( e.clientY / h ) * 2 + 1;
+
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const intersects = this.raycaster.intersectObjects(this.surface.controlPoints);
+
+    if (intersects.length > 0) {
+      const { object } = intersects[0];
+      this.activeControlPoint = object;
+      this.originalActiveControlPoint = this.activeControlPoint.position.clone();
+    }
+  }
+
+	onMouseMove: Function = (e: MouseEvent) => {
+
+    const w = this.canvas.width / window.devicePixelRatio;
+    const h = this.canvas.height / window.devicePixelRatio;
+    this.mouse.x = ( e.clientX / w ) * 2 - 1;
+    this.mouse.y = -( e.clientY / h ) * 2 + 1;
+
+    const { activeControlPoint } = this;
+
+    if (activeControlPoint !== null) {
+
+      e.stopPropagation();
+
+      const neighbors: Array<THREE.Vector3> = [
+        this.originalActiveControlPoint.clone().add(new THREE.Vector3(0.1, 0, 0)),
+        this.originalActiveControlPoint.clone().add(new THREE.Vector3(-0.1, 0, 0)),
+        this.originalActiveControlPoint.clone().add(new THREE.Vector3(0, 0.1, 0)),
+        this.originalActiveControlPoint.clone().add(new THREE.Vector3(0, -0.1, 0)),
+        this.originalActiveControlPoint.clone().add(new THREE.Vector3(0, 0, 0.1)),
+        this.originalActiveControlPoint.clone().add(new THREE.Vector3(0, 0, -0.1)),
+      ];
+
+      const index = this.surface.controlPoints.indexOf(activeControlPoint);
+      this.surface.setActiveControlPointIndex(index);
+
+      // x axis closest point
+      let angle = Infinity;
+      let closestNeighbor: null | THREE.Vector3 = null;
+
+      neighbors.forEach(v => {
+
+        const controlPointProj: THREE.Vector2 = this.originalActiveControlPoint.clone().project(this.camera);
+
+        const tmp = v.clone().project(this.camera);
+        const proj = new THREE.Vector2(tmp.x, tmp.y);
+
+        // normalize neighbor point and mouse relative to projected closest point
+        const normalizedMouse = this.mouse.clone().sub(controlPointProj);
+        const normalizedProj = proj.sub(controlPointProj);
+        const a = Math.abs(normalizedMouse.angle() - normalizedProj.angle());
+
+        if (a < angle && a < 0.25) {
+          angle = a;
+          closestNeighbor = v;
+        }
+      });
+
+      if (closestNeighbor === null) return;
+
+      let dir = closestNeighbor;
+
+      const isX = neighbors.indexOf(dir) < 2;
+      if (isX) this.surface.setAxis('x', activeControlPoint.position);
+      const isY = !isX && neighbors.indexOf(dir) < 4;
+      if (isY) this.surface.setAxis('y', activeControlPoint.position);
+      const isZ = !isX && !isY;
+      if (isZ) this.surface.setAxis('z', activeControlPoint.position);
+
+      dir = dir.clone().sub(this.originalActiveControlPoint).multiplyScalar(0.1);
+      console.log(dir);
+
+      let dist = Infinity;
+      let nearest = dir;
+      let theI;
+
+      for (let i = -4; i < 6; i++) {
+
+        const move = dir.clone().multiplyScalar(2 ** i);
+        const pos = activeControlPoint.position.clone().add(move).project(this.camera);
+        const proj = new THREE.Vector2(pos.x, pos.y);
+
+        if (proj.distanceTo(this.mouse) < dist) {
+          dist = proj.distanceTo(this.mouse);
+          // console.log(dist);
+          nearest = dir;
+          theI = i;
+        }
+      }
+
+      activeControlPoint.position.add(nearest);
+
+      this.surface.update(activeControlPoint);
+      this.draw();
+    }
 	}
 
-	onMove: Function = () => {
-		this.draw();
+	onMouseUp: Function = (e) => {
+    this.activeControlPoint = null;
 	}
 
 	draw: Function = () => {
@@ -103,11 +214,8 @@ export default class CanvasView extends Component<{}, State> {
 		// from the scene when this.surface.update() is called...
 		// thus need to re-add the axes to the scene whenever the surface
 		// might possibly have updated.
-		this.scene.add(axisX);
-		this.scene.add(axisY);
-		this.scene.add(axisZ);
 
-		this.positionCoordinates();
+		// this.positionCoordinates();
 
 		this.renderer.render(this.scene, this.camera);
 	}
@@ -130,7 +238,7 @@ export default class CanvasView extends Component<{}, State> {
 		let pt = this.surface.getActiveControlPoint();
 		if (_.isNil(pt)) return;
 
-		const node = ReactDOM.findDOMNode(this.refs.Coordinates);
+		const node = this.refs.Coordinates;
 		const width = Math.round(node.getBoundingClientRect().width);
 		const height = Math.round(node.getBoundingClientRect().height);
 
@@ -164,70 +272,22 @@ export default class CanvasView extends Component<{}, State> {
 	updateControlPoint: Function = (axis, delta) => {
 
 		const p = this.surface.getActiveControlPoint();
-		if (_.isNil(p)) return;
+		if (p === null) return;
 
-		let q = p.clone(); 
+		let q = p.clone();
 		q[axis] += 0.005 * delta;
 
 		this.surface.setActiveControlPoint(q, axis);
 		this.surface.update();
-		this.positionCoordinates();
+		// this.positionCoordinates();
 		this.draw();
-	}
-
-	// TODO
-	zoomToFit: Function = () => {
-		
-		// assume that we do NOT need to zoom out...
-		let inView = true;
-
-		// assume that we MIGHT need to zoom in...
-		let closeFit = false;
-		
-		["u0", "u1", "v0", "v1"].forEach((crv) => {
-			
-			const bez = this.surface[crv].__bez;
-			
-			["v0", "v1", "v2", "v3"].forEach((pt) => {
-				
-				// if a control point is out of view of the camera,
-				// then we DO need to zoom out
-				const controlPt = bez[pt].clone();
-				controlPt.project(this.camera);
-
-				let ax = Math.abs(controlPt.x);
-				let ay = Math.abs(controlPt.y);
-
-				if (ax > 1 || ay > 1) inView = false;
-
-				if (Math.abs(ax - 1) < 0.1 || Math.abs(ay - 1) < 0.1) {
-					closeFit = true;
-				}
-			});
-		});
-
-		// possibly zoom in?
-		if (inView) {
-			// if a close fit, we're done
-			if (closeFit) return;
-			// zoom in a bit
-			this.zoom(1);
-		} else {
-			// zoom out a bit
-			this.zoom(-1);
-		}
-
-		window.requestAnimationFrame(() => {
-			this.zoomToFit();
-			this.draw();
-		});
 	}
 
 	componentDidMount() {
 
 		// set up canvas
 		const canvas = this.refs.canvas;
-		
+
 		const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
 
 		camera.position.set(0.7, 1, 1.2);
@@ -244,11 +304,11 @@ export default class CanvasView extends Component<{}, State> {
 			ORBIT: THREE.MOUSE.LEFT,
 			PAN: THREE.MOUSE.RIGHT
 		};
-	
+
 		controls.maxPolarAngle = Math.PI / 2;
 		controls.maxDistance = 8000;
-		controls.damping = 0.5;	
-		
+		controls.damping = 0.5;
+
 		controls.addEventListener('change', this.draw);
 
 		renderer.setPixelRatio( window.devicePixelRatio );
@@ -256,8 +316,12 @@ export default class CanvasView extends Component<{}, State> {
 
 		this.canvas = canvas;
 		this.camera = camera;
-		this.renderer = renderer;
-		
+    this.renderer = renderer;
+
+		this.scene.add(axisX);
+		this.scene.add(axisY);
+		this.scene.add(axisZ);
+
 		this.onResize();
 
 		this.surface.setScene(this.scene);
@@ -267,8 +331,11 @@ export default class CanvasView extends Component<{}, State> {
 		this.draw();
 
 		// add event listeners
-		window.addEventListener('resize', this.onResize);
-		
+    window.addEventListener('resize', this.onResize);
+    this.canvas.addEventListener('mousedown', this.onMouseDown);
+    this.canvas.addEventListener('mousemove', this.onMouseMove);
+    this.canvas.addEventListener('mouseup', this.onMouseUp);
+
 		this.controlsManager.on('morph', this.onClick);
 		this.controlsManager.on('restore', () => {
 			this.surface.stop();
@@ -281,18 +348,18 @@ export default class CanvasView extends Component<{}, State> {
 		// if we're past the final step of the tutorial,
 		// exit
 		if (tutorialManager.steps > 0 && stage >= tutorialManager.steps) {
-			
-			this.setState({ 
+
+			this.setState({
 				lastTutorial: -1,
-				tutorial: -1 
+				tutorial: -1
 			});
 
 		// otherwise, progress
 		} else {
 
-			this.setState({ 
+			this.setState({
 				lastTutorial: this.state.tutorial,
-				tutorial: stage 
+				tutorial: stage
 			});
 		}
 	}
@@ -305,19 +372,14 @@ export default class CanvasView extends Component<{}, State> {
 			top: this.state.coordinatesY,
 		};
 
-		const helperText = () => {
-			return { __html: this.state.helperText };
-		};
-
 		return (
 			<div>
 				<canvas ref="canvas" />
-				<Coordinates 
+				<Coordinates
 					ref="Coordinates"
-					surface={this.surface} 
+					surface={this.surface}
 					style={coordinatesStyle}
 					active={this.state.coordinates} />
-				<div className="helper-text" dangerouslySetInnerHTML={helperText()}></div>
 				<Controls manager={this.controlsManager} />
 			</div>
 		)
