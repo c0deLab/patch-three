@@ -157,7 +157,9 @@ export default class CanvasView extends Component {
 	onClick(e) {
 		this.updateLastInteraction();
 		this.surface.stop();
-		this.surface.randomize(60, this.draw);
+		this.surface.randomize(60, this.draw, () => {
+			this.zoomToFit(0.1);
+		});
 	}
 
 	onKeyDown(e) {
