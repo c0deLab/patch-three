@@ -120,8 +120,10 @@ export default class CanvasView extends Component {
 			this.surface.stop();
 
 			this.surface.randomizeCloseToOriginal(500, (t) => {
-				this.rotateCameraXY(1.5 * easing.dEase(t));
+				this.rotateCameraXY(0.25 * easing.dEase(t));
 				this.draw();
+			}, () => {
+				this.zoomToFit(0.01);
 			});
 		}
 
@@ -272,12 +274,12 @@ export default class CanvasView extends Component {
 	}
 
 	rotateCameraXY(delta) {
-		let angle = 0.001 * delta;
+		let angle = 0.006 * delta;
 		this.azimuth += angle;
 	}
 
 	rotateCameraZ(delta) {
-		let angle = 0.0008 * delta;
+		let angle = 0.005 * delta;
 		this.altitude += angle;
 
 		// for max altitude = PI / 2, looking straight down
@@ -291,7 +293,7 @@ export default class CanvasView extends Component {
 	}
 
 	toggle(delta) {
-		if (Math.abs(delta) < 6) return;
+		if (Math.abs(delta) < 1.8) return;
 		this.surface.setActiveControlPointIndex(delta > 0 ? 1 : -1);
 		this.draw();
 	}
@@ -370,7 +372,7 @@ export default class CanvasView extends Component {
 	}
 
 	// TODO
-	zoomToFit() {
+	zoomToFit(speed = 1) {
 		
 		// assume that we do NOT need to zoom out...
 		let inView = true;
@@ -401,18 +403,22 @@ export default class CanvasView extends Component {
 		});
 
 		// possibly zoom in?
+		let factor;
 		if (inView) {
 			// if a close fit, we're done
 			if (closeFit) return;
 			// zoom in a bit
-			this.zoom(1);
+			factor = 1 + 0.1 * speed;
 		} else {
 			// zoom out a bit
-			this.zoom(-1);
+			factor = 1 - 0.1 * speed;
 		}
 
+		this.camera.zoom *= factor;
+		this.camera.updateProjectionMatrix();
+
 		window.requestAnimationFrame(() => {
-			this.zoomToFit();
+			this.zoomToFit(speed);
 			this.draw();
 		});
 	}

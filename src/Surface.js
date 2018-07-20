@@ -407,7 +407,7 @@ class Surface {
     return C;
   }
 
-  step(t, duration, cb) {
+  step(t, duration, cb, done) {
     ["u0", "u1", "v0", "v1"].forEach((k) => {
 
       let b = this[k].__bez; // boundary curve
@@ -428,12 +428,14 @@ class Surface {
     if (t < duration && cb) {
       this.animationFrame = window.requestAnimationFrame(() => {
         cb(t / duration);
-        this.step(t + 1, duration, cb);
+        this.step(t + 1, duration, cb, done);
       });
+    } else if (done) {
+      done();
     }
   }
 
-  randomize(duration, cb) {
+  randomize(duration, cb, done) {
 
     let r = () => Math.random() - 0.5;
     let rp = () => new THREE.Vector3(r(), r(), r());
@@ -454,10 +456,10 @@ class Surface {
     });
 
     // now that we have the target surface, step toward it
-    this.morph(s, duration, cb);
+    this.morph(s, duration, cb, done);
   }
 
-  randomizeCloseToOriginal(duration, cb) {
+  randomizeCloseToOriginal(duration, cb, done) {
 
     let r = () => Math.random() * 0.8 - 0.4;
     let rp = () => new THREE.Vector3(r(), r(), r());
@@ -478,10 +480,10 @@ class Surface {
     });
 
     // now that we have the target surface, step toward it
-    this.morph(s, duration, cb);
+    this.morph(s, duration, cb, done);
   }
 
-  morph(targetSrf, duration, cb) {
+  morph(targetSrf, duration, cb, done) {
 
     targetSrf.resolve();
 
@@ -509,7 +511,7 @@ class Surface {
     });
 
     // now that we have our dx, dy, dz, step toward it
-    this.step(0, duration, cb);
+    this.step(0, duration, cb, done);
   }
 
   restore(duration, cb) {
