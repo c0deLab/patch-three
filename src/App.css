@@ -14,9 +14,9 @@ body {
 	left: 2vw;
 	top: 2vw;
 	position: absolute;
-	color: #fff;
-	font-family: monospace;
-	font-size: 2vw;
+	color:white;
+	font-family: 'Helvetica Neue', Helvetica, sans-serif;
+	font-size: 20px;
 	letter-spacing: 0.06em;
 }
 

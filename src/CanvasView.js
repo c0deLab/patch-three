@@ -43,24 +43,24 @@ export default class CanvasView extends Component {
 		tutorialManager.cv = this;
 
 		this.actions = {
-			TOGGLE: _.throttle(this.toggle.bind(this), 250),
-			"←→": this.rotateCameraXY.bind(this),
-			"↑↓": this.rotateCameraZ.bind(this),
-			ZOOM: this.zoom.bind(this),
-			X_AXIS: this.updateControlPoint.bind(this, "x"),
-			Y_AXIS: this.updateControlPoint.bind(this, "y"),
-			Z_AXIS: this.updateControlPoint.bind(this, "z")
+			"Select Control Point": _.throttle(this.toggle.bind(this), 250),
+			"XY Camera Rotation (←→)": this.rotateCameraXY.bind(this),
+			"YZ Camera Rotation (↑↓)": this.rotateCameraZ.bind(this),
+			Zoom: this.zoom.bind(this),
+			"Move Control Point Along X Axis": this.updateControlPoint.bind(this, "x"),
+			"Move Control Point Along Y Axis": this.updateControlPoint.bind(this, "y"),
+			"Move Control Point Along Z Axis": this.updateControlPoint.bind(this, "z")
 		};
 
 		this.keys = { 
-			85: "←→",
-			86: "↑↓",
-			73: "TOGGLE",
-			87: "ZOOM",
+			85: "XY Camera Rotation (←→)",
+			86: "YZ Camera Rotation (↑↓)",
+			73: "Select Control Point",
+			87: "Zoom",
 			69: "DISPLAY",
-			74: "X_AXIS",
-			75: "Y_AXIS",
-			76: "Z_AXIS",
+			74: "Move Control Point Along X Axis",
+			75: "Move Control Point Along Y Axis",
+			76: "Move Control Point Along Z Axis",
 			66: "RESTORE",
 			72: "EXIT",
 			68: "TUTORIAL",
@@ -202,7 +202,7 @@ export default class CanvasView extends Component {
 
 			this.zoomToFit();
 
-		} else if (action === "TOGGLE") {
+		} else if (action === "Select Control Point") {
 
 			if (!this.surface.controls) {
 
@@ -215,11 +215,11 @@ export default class CanvasView extends Component {
 				this.surface.update();
 			}
 
-		} else if (action === "X_AXIS" || action === "Y_AXIS" || action === "Z_AXIS") {
+		} else if (action === "Move Control Point Along X Axis" || action === "Move Control Point Along Y Axis" || action === "Move Control Point Along Z Axis") {
 
 			this.surface.stop();
 
-			let axis = action === "X_AXIS" ? "x" : action === "Y_AXIS" ? "y" : "z";
+			let axis = action === "Move Control Point Along X Axis" ? "x" : action === "Move Control Point Along Y Axis" ? "y" : "z";
 
 			this.surface.setAxis(axis);
 			

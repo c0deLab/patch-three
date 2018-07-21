@@ -218,9 +218,13 @@ class Surface {
     
     if (isActive) {
       controlPt.scale.set(1.6, 1.6, 1.6);
+      /*
+      Trying to change the color of the active control point here
+      controlPt.color.set(yellow);
+      */
       controlPt.material = activeControlPointMaterial;
     } else {
-      controlPt.scale.set(1, 1, 1);
+      controlPt.scale.set(0.7, 0.7, 0.7);
       controlPt.material = controlPtMaterial;
     }
   }
