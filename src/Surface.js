@@ -518,8 +518,8 @@ class Surface {
     this.step(0, duration, cb, done);
   }
 
-  restore(duration, cb) {
-    this.morph(new Surface(), duration, cb);
+  restore(duration, cb, done) {
+    this.morph(new Surface(), duration, cb, done);
   }
 
   rotate(axis, angle) {

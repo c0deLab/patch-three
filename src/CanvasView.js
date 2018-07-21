@@ -291,7 +291,7 @@ export default class CanvasView extends Component {
 	}
 
 	restoreSurface() {
-		this.surface.restore(60, this.draw);
+		this.surface.restore(60, this.draw, () => this.zoomToFit(0.3));
 	}
 
 	toggle(delta) {
@@ -373,7 +373,6 @@ export default class CanvasView extends Component {
 		this.camera.updateProjectionMatrix();
 	}
 
-	// TODO
 	zoomToFit(speed = 1) {
 		
 		// assume that we do NOT need to zoom out...
@@ -381,28 +380,52 @@ export default class CanvasView extends Component {
 
 		// assume that we MIGHT need to zoom in...
 		let closeFit = false;
-		
-		["u0", "u1", "v0", "v1"].forEach((crv) => {
-			
-			const bez = this.surface[crv].__bez;
-			
-			["v0", "v1", "v2", "v3"].forEach((pt) => {
-				
-				// if a control point is out of view of the camera,
-				// then we DO need to zoom out
-				const controlPt = bez[pt].clone();
-				controlPt.project(this.camera);
 
-				let ax = Math.abs(controlPt.x);
-				let ay = Math.abs(controlPt.y);
+		let maxX = -Infinity;
+		let maxY = -Infinity;
+		let minX = Infinity;
+		let minY = Infinity;
 
-				if (ax > 1 || ay > 1) inView = false;
+		const virtualMinLower = -0.95;
+		const virtualMinUpper = -0.9;
+		const virtualMaxLower = 0.9;
+		const virtualMaxUpper = 0.95;
 
-				if (Math.abs(ax - 1) < 0.1 || Math.abs(ay - 1) < 0.1) {
-					closeFit = true;
+		function isBad(x) {
+			return x < virtualMinLower || x > virtualMaxUpper;
+		}
+
+		for (let u = 0; u <= 1; u += 0.1) {
+
+			for (let v = 0; v <= 1; v += 0.1) {
+
+				const pt = this.surface.patch(u, v).clone().project(this.camera);
+
+				const { x, y } = pt;
+
+				if ( isBad(x) || isBad(y) ) {
+					inView = false;
+					break;
 				}
-			});
-		});
+
+				if (x > maxX) maxX = x;
+				if (x < minX) minX = x;
+				if (y > maxY) maxY = y;
+				if (y < minY) minY = y;
+			}
+		}
+
+		function inMinRange(x) {
+			return x > virtualMinLower && x < virtualMinUpper;
+		}
+
+		function inMaxRange(x) {
+			return x > virtualMaxLower && x < virtualMaxUpper;
+		}
+
+		if (inMinRange(minX) || inMaxRange(maxX) || inMinRange(minY) || inMaxRange(maxY)) {
+			closeFit = true;
+		}
 
 		// possibly zoom in?
 		let factor;
