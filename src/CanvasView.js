@@ -41,30 +41,46 @@ export default class CanvasView extends Component {
 		this.surface = new Surface();
 		tutorialManager.cv = this;
 
+		this.actionNames = {
+			SELECT: "Select Control Point",
+			CAMERA_XY: "XY Camera Rotation (←→)",
+			CAMERA_Z: "YZ Camera Rotation (↑↓)",
+			ZOOM: "Zoom",
+			MOVE_X: "Move Control Point Along X Axis",
+			MOVE_Y: "Move Control Point Along Y Axis",
+			MOVE_Z: "Move Control Point Along Z Axis",
+			TUTORIAL: "TUTORIAL",
+			DISPLAY: "DISPLAY",
+			RESTORE: "RESTORE",
+			EXIT: "EXIT",
+			MORPH: "MORPH",
+			ZOOMTOFIT: "ZOOMTOFIT"
+		};
+
 		this.actions = {
-			"Select Control Point": _.throttle(this.toggle, 250),
-			"XY Camera Rotation (←→)": this.rotateCameraXY,
-			"YZ Camera Rotation (↑↓)": this.rotateCameraZ,
-			Zoom: this.zoom,
-			"Move Control Point Along X Axis": this.updateControlPoint.bind(this, "x"),
-			"Move Control Point Along Y Axis": this.updateControlPoint.bind(this, "y"),
-			"Move Control Point Along Z Axis": this.updateControlPoint.bind(this, "z")
+			[this.actionNames.SELECT]: _.throttle(this.toggle, 250),
+			[this.actionNames.CAMERA_XY]: this.rotateCameraXY,
+			[this.actionNames.CAMERA_Z]: this.rotateCameraZ,
+			[this.actionNames.ZOOM]: this.zoom,
+			[this.actionNames.MOVE_X]: this.updateControlPoint.bind(this, "x"),
+			[this.actionNames.MOVE_Y]: this.updateControlPoint.bind(this, "y"),
+			[this.actionNames.MOVE_Z]: this.updateControlPoint.bind(this, "z")
 		};
 
 		this.keys = { 
-			85: "XY Camera Rotation (←→)",
-			86: "YZ Camera Rotation (↑↓)",
-			73: "Select Control Point",
-			87: "Zoom",
-			69: "DISPLAY",
-			74: "Move Control Point Along X Axis",
-			75: "Move Control Point Along Y Axis",
-			76: "Move Control Point Along Z Axis",
-			66: "RESTORE",
-			72: "EXIT",
-			68: "TUTORIAL",
-			65: "MORPH",
-			88: "ZOOMTOFIT",
+			85: this.actionNames.CAMERA_XY,
+			86: this.actionNames.CAMERA_Z,
+			73: this.actionNames.SELECT,
+			87: this.actionNames.ZOOM,
+			69: this.actionNames.DISPLAY,
+			74: this.actionNames.MOVE_X,
+			75: this.actionNames.MOVE_Y,
+			76: this.actionNames.MOVE_Z,
+			66: this.actionNames.RESTORE,
+			72: this.actionNames.EXIT,
+			68: this.actionNames.TUTORIAL,
+			65: this.actionNames.MORPH,
+			88: this.actionNames.ZOOMTOFIT
 		};
 
 		/**
@@ -150,17 +166,18 @@ export default class CanvasView extends Component {
 		this.updateLastInteraction();
 
 		const code = e.keyCode;
+		const { actionNames } = this;
 
 		if (!(code in this.keys)) return;
 
 		let action = this.keys[code];
 
-		if (action === this.state.action && action !== "TUTORIAL") action = null;
-		if (this.preventKeysExceptTutorial && action !== "TUTORIAL") return;
+		if (action === this.state.action && action !== actionNames.TUTORIAL) action = null;
+		if (this.preventKeysExceptTutorial && action !== actionNames.TUTORIAL) return;
 
-		if (action === "EXIT") {
+		if (action === actionNames.EXIT) {
 			window.location.reload(true);
-		} if (action !== "TUTORIAL") {
+		} if (action !== actionNames.TUTORIAL) {
 			this.setState({ 
 				lastTutorial: this.state.tutorial >= 0 ? this.state.tutorial : this.state.lastTutorial,
 				tutorial: -1
@@ -177,15 +194,15 @@ export default class CanvasView extends Component {
 
 		// some keys should trigger changes by themselves,
 		// not just setting the action for the wheel to handle
-		if (action === "MORPH") {
+		if (action === actionNames.MORPH) {
 
 			this.onClick();
 
-		} else if (action === "ZOOMTOFIT") {
+		} else if (action === actionNames.ZOOMTOFIT) {
 
 			this.zoomToFit();
 
-		} else if (action === "Select Control Point") {
+		} else if (action === actionNames.SELECT) {
 
 			if (!this.surface.controls) {
 
@@ -198,11 +215,11 @@ export default class CanvasView extends Component {
 				this.surface.update();
 			}
 
-		} else if (action === "Move Control Point Along X Axis" || action === "Move Control Point Along Y Axis" || action === "Move Control Point Along Z Axis") {
+		} else if ([actionNames.MOVE_X, actionNames.MOVE_Y, actionNames.MOVE_Z].indexOf(action) > -1) {
 
 			this.surface.stop();
 
-			let axis = action === "Move Control Point Along X Axis" ? "x" : action === "Move Control Point Along Y Axis" ? "y" : "z";
+			let axis = action === actionNames.MOVE_X ? "x" : action === actionNames.MOVE_Y ? "y" : "z";
 
 			this.surface.setAxis(axis);
 			
@@ -214,10 +231,10 @@ export default class CanvasView extends Component {
 
 			this.surface.update();
 
-		} else if (action === "RESTORE") {
+		} else if (action === actionNames.RESTORE) {
 			this.surface.stop();
 			this.restoreSurface();
-		} else if (action === "DISPLAY") {
+		} else if (action === actionNames.DISPLAY) {
 			this.surface.nextDisplay();
 		} else {
 			this.setState({ coordinates: false });
