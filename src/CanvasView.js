@@ -42,10 +42,10 @@ export default class CanvasView extends Component {
 		tutorialManager.cv = this;
 
 		this.actions = {
-			"Select Control Point": _.throttle(this.toggle.bind(this), 250),
-			"XY Camera Rotation (←→)": this.rotateCameraXY.bind(this),
-			"YZ Camera Rotation (↑↓)": this.rotateCameraZ.bind(this),
-			Zoom: this.zoom.bind(this),
+			"Select Control Point": _.throttle(this.toggle, 250),
+			"XY Camera Rotation (←→)": this.rotateCameraXY,
+			"YZ Camera Rotation (↑↓)": this.rotateCameraZ,
+			Zoom: this.zoom,
 			"Move Control Point Along X Axis": this.updateControlPoint.bind(this, "x"),
 			"Move Control Point Along Y Axis": this.updateControlPoint.bind(this, "y"),
 			"Move Control Point Along Z Axis": this.updateControlPoint.bind(this, "z")
@@ -75,22 +75,6 @@ export default class CanvasView extends Component {
 		this.azimuth = Math.PI / 8;
 		this.altitude = Math.PI / 4;
 
-		/**
-		 * Bind class methods that use `this` as calling context.
-		 */
-		this.iter = this.iter.bind(this);
-		this.checkLastInteraction = this.checkLastInteraction.bind(this);
-		this.onResize = _.debounce(this.onResize.bind(this), 250); // debounced because expensive
-		this.onClick = this.onClick.bind(this);
-		this.onWheel = this.onWheel.bind(this);
-		this.onKeyDown = this.onKeyDown.bind(this);
-		this.draw = this.draw.bind(this);
-		this.updateControlPoint = this.updateControlPoint.bind(this);
-		this.positionCamera = this.positionCamera.bind(this);
-		this.restoreSurface = this.restoreSurface.bind(this);
-		this.tutorial = this.tutorial.bind(this);
-		this.zoomToFit = this.zoomToFit.bind(this);
-
 		this.preventKeysExceptTutorial = false;
 	}
 
@@ -99,11 +83,11 @@ export default class CanvasView extends Component {
 	 * Useful in that it triggers .render()
 	 * without any other side effects.
 	 */
-	iter() {
+	iter = () => {
 		this.setState({ i: this.state.i + 1 });
 	}
 
-	checkLastInteraction() {
+	checkLastInteraction = () => {
 
 		const timeout = 25 * 1000; // 25 seconds
 
@@ -129,14 +113,14 @@ export default class CanvasView extends Component {
 		window.setTimeout(this.checkLastInteraction, timeout);
 	}
 
-	updateLastInteraction(cb) {
+	updateLastInteraction = (cb) => {
 		this.setState({
 			lastInteraction: new Date(),
 			idles: 0
 		}, cb);
 	}
 
-	onResize() {
+	onResize = _.debounce(() => {
 
 		this.updateLastInteraction();
 
@@ -151,9 +135,9 @@ export default class CanvasView extends Component {
 		this.renderer.render(this.scene, this.camera);
 
 		this.positionCoordinates();
-	}
+	}, 250)
 
-	onClick(e) {
+	onClick = (e) => {
 		this.updateLastInteraction();
 		this.surface.stop();
 		this.surface.randomize(60, this.draw, () => {
@@ -161,7 +145,7 @@ export default class CanvasView extends Component {
 		});
 	}
 
-	onKeyDown(e) {
+	onKeyDown = (e) => {
 
 		this.updateLastInteraction();
 
@@ -195,7 +179,7 @@ export default class CanvasView extends Component {
 		// not just setting the action for the wheel to handle
 		if (action === "MORPH") {
 
-			this.onClick.call(this);
+			this.onClick();
 
 		} else if (action === "ZOOMTOFIT") {
 
@@ -243,7 +227,7 @@ export default class CanvasView extends Component {
 		this.draw();
 	}
 
-	onWheel(e) {
+	onWheel = (e) => {
 
 		e.preventDefault();
 
@@ -258,7 +242,7 @@ export default class CanvasView extends Component {
 		this.draw();
 	}
 
-	draw() {
+	draw = () => {
 
 		// a little messy, but this.surface removes all children
 		// from the scene when this.surface.update() is called...
@@ -274,12 +258,12 @@ export default class CanvasView extends Component {
 		this.renderer.render(this.scene, this.camera);
 	}
 
-	rotateCameraXY(delta) {
+	rotateCameraXY = (delta) => {
 		let angle = 0.006 * delta;
 		this.azimuth += angle;
 	}
 
-	rotateCameraZ(delta) {
+	rotateCameraZ = (delta) => {
 		let angle = 0.005 * delta;
 		this.altitude += angle;
 
@@ -289,17 +273,17 @@ export default class CanvasView extends Component {
 		this.altitude = _.clamp(this.altitude, -Math.PI / 2, Math.PI / 2);
 	}
 
-	restoreSurface() {
+	restoreSurface = () => {
 		this.surface.restore(60, this.draw, () => this.zoomToFit(0.3));
 	}
 
-	toggle(delta) {
+	toggle = (delta) => {
 		if (Math.abs(delta) < 1.8) return;
 		this.surface.setActiveControlPointIndex(delta > 0 ? 1 : -1);
 		this.draw();
 	}
 
-	positionCoordinates() {
+	positionCoordinates = () => {
 
 		// get active control point location in screen space
 		// to decide where to show Coordinates
@@ -337,7 +321,7 @@ export default class CanvasView extends Component {
 		});
 	}
 
-	updateControlPoint(axis, delta) {
+	updateControlPoint = (axis, delta) => {
 
 		const p = this.surface.getActiveControlPoint();
 		if (_.isNil(p)) return;
@@ -351,7 +335,7 @@ export default class CanvasView extends Component {
 		this.draw();
 	}
 
-	positionCamera() {
+	positionCamera = () => {
 
 		let x = 2 * Math.cos(this.azimuth) * Math.cos(this.altitude);
 		let y = 2 * Math.sin(this.azimuth) * Math.cos(this.altitude);
@@ -365,14 +349,14 @@ export default class CanvasView extends Component {
 		this.camera.updateProjectionMatrix();
 	}
 
-	zoom(delta) {
+	zoom = (delta) => {
 		const zoomOut = delta > 0;     // boolean
 		const factor = zoomOut ? 1.1 : 0.9; // number
 		this.camera.zoom *= factor;
 		this.camera.updateProjectionMatrix();
 	}
 
-	zoomToFit(speed = 1) {
+	zoomToFit = (speed = 1) => {
 		
 		// assume that we do NOT need to zoom out...
 		let inView = true;
@@ -484,11 +468,11 @@ export default class CanvasView extends Component {
 		// add event listeners
 		window.addEventListener('resize', this.onResize);
 		window.addEventListener('click', this.onClick);
-		window.addEventListener('wheel', this.onWheel.bind(this));
-		window.addEventListener('keydown', this.onKeyDown.bind(this));
+		window.addEventListener('wheel', this.onWheel);
+		window.addEventListener('keydown', this.onKeyDown);
 	}
 
-	tutorial(stage) {
+	tutorial = (stage) => {
 
 		// if we're past the final step of the tutorial,
 		// exit
