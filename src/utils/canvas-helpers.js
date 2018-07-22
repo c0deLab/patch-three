@@ -1,4 +1,4 @@
-const THREE = require('three');
+import * as THREE from 'three';
 
 const axisGeoX = new THREE.Geometry();
 const axisGeoY = new THREE.Geometry();
@@ -26,13 +26,13 @@ const axisMaterial = new THREE.LineDashedMaterial({
 	transparent: true
 });
 
-axisGeoX.computeLineDistances();
-axisGeoY.computeLineDistances();
-axisGeoZ.computeLineDistances();
-
 const axisX = new THREE.Line(axisGeoX, axisMaterial);
 const axisY = new THREE.Line(axisGeoY, axisMaterial);
 const axisZ = new THREE.Line(axisGeoZ, axisMaterial);
+
+axisX.computeLineDistances();
+axisY.computeLineDistances();
+axisZ.computeLineDistances();
 
 export {
 	axisX,

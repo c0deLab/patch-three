@@ -1,4 +1,5 @@
 import _ from 'lodash';
+import * as THREE from 'three';
 
 import easing from './utils/easing';
 import { 
@@ -12,8 +13,6 @@ import {
   axisY,
   axisZ
 } from './utils/surface-helpers';
-
-const THREE = require('three');
 
 /*
  *	Returns a curve object to be added to a scene.
@@ -236,9 +235,9 @@ class Surface {
 
     const lineGeo = new THREE.Geometry();
     lineGeo.vertices.push(v1, v2);
-    lineGeo.computeLineDistances();
     
     const lineMesh = new THREE.Line(lineGeo, controlMaterial);
+    lineMesh.computeLineDistances();
     lineMesh.visible = false;
     lineMesh.name = crv_1 + "-" + pt_1 + "-" + crv_2 + "-" + pt_2;
     this.scene.add(lineMesh);

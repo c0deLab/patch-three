@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "lodash": "^4.17.4",
-    "react": "^15.6.1",
-    "react-dom": "^15.6.1",
-    "three": "^0.86.0"
+    "lodash": "^4.17.10",
+    "react": "^16.4.1",
+    "react-dom": "^16.4.1",
+    "three": "^0.94.0"
   },
   "devDependencies": {
-    "react-scripts": "1.0.10"
+    "react-scripts": "1.1.4"
   },
   "scripts": {
     "start": "react-scripts start",

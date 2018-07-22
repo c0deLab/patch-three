@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import ReactDOM from 'react-dom';
 import _ from 'lodash';
+import * as THREE from 'three';
 
 import Surface from './Surface';
 import Coordinates from './Coordinates';
@@ -9,8 +10,6 @@ import tutorialManager from './tutorial/tutorialManager';
 
 import { axisX, axisY, axisZ } from './utils/canvas-helpers';
 import easing from './utils/easing';
-
-const THREE = require('three');
 
 /**
  * Responsible for maintaining app state, including the Surface,

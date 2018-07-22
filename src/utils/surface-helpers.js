@@ -1,4 +1,4 @@
-const THREE = require('three');
+import * as THREE from 'three';
 
 // helper for new vec3
 const p = (x, y, z = 0.5) => new THREE.Vector3(x - 0.5, y - 0.5, z - 0.5);
@@ -56,10 +56,6 @@ const axisMaterial = new THREE.LineDashedMaterial({
 	transparent: true
 });
 
-axisGeoX.computeLineDistances();
-axisGeoY.computeLineDistances();
-axisGeoZ.computeLineDistances();
-
 const axisX = new THREE.Group();
 axisX.visible = false;
 const axisY = new THREE.Group();
@@ -95,15 +91,22 @@ const arrowTwoZ = arrow.clone();
 arrowTwoZ.rotation.x -= Math.PI / 2;
 arrowTwoZ.position.set(0, 0, -axisLength);
 
-axisX.add(new THREE.Line(axisGeoX, axisMaterial.clone()));
+const lineX = new THREE.Line(axisGeoX, axisMaterial.clone());
+const lineY = new THREE.Line(axisGeoY, axisMaterial.clone());
+const lineZ = new THREE.Line(axisGeoZ, axisMaterial.clone());
+lineX.computeLineDistances();
+lineY.computeLineDistances();
+lineZ.computeLineDistances();
+
+axisX.add(lineX);
 axisX.add(arrowOneX);
 axisX.add(arrowTwoX);
 
-axisY.add(new THREE.Line(axisGeoY, axisMaterial.clone()));
+axisY.add(lineY);
 axisY.add(arrowOneY);
 axisY.add(arrowTwoY);
 
-axisZ.add(new THREE.Line(axisGeoZ, axisMaterial.clone()));
+axisZ.add(lineZ);
 axisZ.add(arrowOneZ);
 axisZ.add(arrowTwoZ);
 
