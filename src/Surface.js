@@ -301,8 +301,8 @@ class Surface {
         let u_pt = this.patch(u, v);
         let v_pt = this.patch(v, u);
 
-        if (this.display < 2)    u_crv.vertices.push(u_pt);
-        if (this.display !== 1)  v_crv.vertices.push(v_pt);
+        u_crv.vertices.push(u_pt);
+        v_crv.vertices.push(v_pt);
       }
 
       const material = (u === 0 || u === 1) ? boundaryMaterial : interiorMaterial;
@@ -359,6 +359,9 @@ class Surface {
         const s = this.patch(v, u);
         pt.set(s.x, s.y, s.z);
       });
+
+      // hide u_crvs when display === 2
+      crv.visible = this.display !== 2;
     });
 
     this.v_crvs.forEach((crv, i) => {
@@ -369,6 +372,9 @@ class Surface {
         const s = this.patch(u, v);
         pt.set(s.x, s.y, s.z);
       });
+
+      // hide v_crvs when display === 1
+      crv.visible = this.display !== 1;
     });
     
     this.positionControlLine("v0", "v0", "v0", "v1");
