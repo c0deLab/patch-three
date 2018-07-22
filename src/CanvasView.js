@@ -298,6 +298,8 @@ export default class CanvasView extends Component {
 		if (Math.abs(delta) < 1.8) return;
 		this.surface.setActiveControlPointIndex(delta > 0 ? 1 : -1);
 		this.draw();
+		const activeControlPt = this.surface.getActiveControlPoint().clone().project(this.camera);
+		if (Math.abs(activeControlPt.x) > 0.95 || Math.abs(activeControlPt.y) > 0.95) this.zoomToFit(0.3);
 	}
 
 	positionCoordinates = () => {
