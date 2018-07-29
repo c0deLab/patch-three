@@ -54,7 +54,8 @@ export default class CanvasView extends Component {
 			RESTORE: "RESTORE",
 			EXIT: "EXIT",
 			MORPH: "MORPH",
-			ZOOMTOFIT: "ZOOMTOFIT"
+			ZOOMTOFIT: "ZOOMTOFIT",
+			DOWNLOAD_SVG: "DOWNLOAD_SVG"
 		};
 
 		this.actions = {
@@ -80,7 +81,8 @@ export default class CanvasView extends Component {
 			72: this.actionNames.EXIT,
 			68: this.actionNames.TUTORIAL,
 			65: this.actionNames.MORPH,
-			88: this.actionNames.ZOOMTOFIT
+			88: this.actionNames.ZOOMTOFIT,
+			192: this.actionNames.DOWNLOAD_SVG
 		};
 
 		/**
@@ -201,6 +203,10 @@ export default class CanvasView extends Component {
 		} else if (action === actionNames.ZOOMTOFIT) {
 
 			this.zoomToFit();
+
+		} else if (action === actionNames.DOWNLOAD_SVG) {
+			
+			this.downloadSVG();
 
 		} else if (action === actionNames.SELECT) {
 
@@ -446,6 +452,57 @@ export default class CanvasView extends Component {
 			this.zoomToFit(speed);
 			this.draw();
 		});
+	}
+
+	downloadSVG = () => {
+		
+		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+		const { canvas } = this;
+		const { width, height } = canvas;
+		
+		svg.setAttribute('viewBox', `-${width} -${height} ${2 * width} ${2 * height}`);
+		svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+		// background
+		const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+		rect.setAttribute('x', -width);
+		rect.setAttribute('y', -height);
+		rect.setAttribute('width', 2 * width);
+		rect.setAttribute('height', 2 * height);
+		rect.setAttribute('fill', 'black');
+		svg.appendChild(rect);
+		
+		const { u_crvs, v_crvs } = this.surface;
+
+		const renderCurve = curve => {
+			const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+			let pathString = '';
+			curve.geometry.vertices.forEach((v, i) => {
+				let { x, y } = v.clone().project(this.camera);
+				x = width * Math.round(x * 1000) / 1000;
+				y = -height * Math.round(y * 1000) / 1000;
+				if (i === 0) {
+					pathString += `M ${x} ${y}`;
+				} else {
+					pathString += ` L ${x} ${y}`;
+				}
+			});
+			path.setAttribute('d', pathString);
+			path.setAttribute('fill', 'none');
+			path.setAttribute('stroke', '#fff');
+			path.setAttribute('stroke-width', window.devicePixelRatio);
+			svg.appendChild(path);
+		}
+		
+		for (let u of u_crvs) renderCurve(u);
+		for (let v of v_crvs) renderCurve(v);
+
+		const svgBlob = new Blob([svg.outerHTML], {type:"image/svg+xml;charset=utf-8"});
+		const svgUrl = URL.createObjectURL(svgBlob);
+		const a = document.createElement('a');
+		a.href = svgUrl;
+		a.download = 'test_n.svg';
+		a.click();
 	}
 
 	componentDidMount() {
