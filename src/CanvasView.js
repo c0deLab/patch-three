@@ -55,7 +55,8 @@ export default class CanvasView extends Component {
 			EXIT: "EXIT",
 			MORPH: "MORPH",
 			ZOOMTOFIT: "ZOOMTOFIT",
-			DOWNLOAD_SVG: "DOWNLOAD_SVG"
+			DOWNLOAD_SVG: "DOWNLOAD_SVG",
+			DOWNLOAD_PNG: "DOWNLOAD_PNG"
 		};
 
 		this.actions = {
@@ -82,7 +83,8 @@ export default class CanvasView extends Component {
 			68: this.actionNames.TUTORIAL,
 			65: this.actionNames.MORPH,
 			88: this.actionNames.ZOOMTOFIT,
-			192: this.actionNames.DOWNLOAD_SVG
+			192: this.actionNames.DOWNLOAD_SVG,
+			189: this.actionNames.DOWNLOAD_PNG
 		};
 
 		/**
@@ -207,6 +209,10 @@ export default class CanvasView extends Component {
 		} else if (action === actionNames.DOWNLOAD_SVG) {
 			
 			this.downloadSVG();
+
+		} else if (action === actionNames.DOWNLOAD_PNG) {
+			
+			this.downloadPNG();
 
 		} else if (action === actionNames.SELECT) {
 
@@ -526,6 +532,14 @@ export default class CanvasView extends Component {
 		const a = document.createElement('a');
 		a.href = svgUrl;
 		a.download = 'test_n.svg';
+		a.click();
+	}
+
+	downloadPNG = () => {
+		this.draw();
+		const a = document.createElement('a');
+		a.href = this.canvas.toDataURL();
+		a.download = 'patch.png';
 		a.click();
 	}
 
