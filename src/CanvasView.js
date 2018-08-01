@@ -471,6 +471,30 @@ export default class CanvasView extends Component {
 		rect.setAttribute('height', 2 * height);
 		rect.setAttribute('fill', 'black');
 		svg.appendChild(rect);
+
+		const renderAxis = (x, y, z) => {
+			const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+			const max = (new THREE.Vector3(x, y, z)).multiplyScalar(0.01).project(this.camera);
+			const min = (new THREE.Vector3(-x, -y, -z)).multiplyScalar(0.01).project(this.camera);
+			do {
+				max.multiplyScalar(1.1);
+			} while (Math.abs(max.x) < 1 && Math.abs(max.y) < 1);
+			do {
+				min.multiplyScalar(1.1);
+			} while (Math.abs(min.x) < 1 && Math.abs(min.y) < 1);
+
+			line.setAttribute('x1', z === 0 ? width * max.x : 0);
+			line.setAttribute('y1', z === 0 ? -height * max.y : height);
+			line.setAttribute('x2', z === 0 ? width * min.x : 0);
+			line.setAttribute('y2', z === 0 ? -height * min.y : -height);
+			line.setAttribute('stroke', '#fff');
+			line.setAttribute('stroke-width', window.devicePixelRatio / 2);
+			svg.appendChild(line);
+		};
+
+		renderAxis(1, 0, 0);
+		renderAxis(0, 1, 0);
+		renderAxis(0, 0, 1);
 		
 		const { u_crvs, v_crvs } = this.surface;
 
