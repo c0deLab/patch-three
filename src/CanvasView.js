@@ -16,48 +16,77 @@ import easing from './utils/easing';
  * handling user interactions, and drawing to the screen.
  */
 export default class CanvasView extends Component {
+
+	/**
+	 * Initial state:
+	 * - no action selected (control knob does nothing)
+	 * - iteration set to 0
+	 * - coordinates not visible
+	 * - last interaction happened at this precise moment
+	 */
+	state = {
+		action: null,
+		i: 0,
+		coordinates: false,
+		lastInteraction: new Date(),
+		tutorial: -1, // stage of tutorial (-1 for not active),
+		lastTutorial: -1,
+		idles: 0,
+	};
+
+	surface = new Surface();
+
+	actionNames = {
+		SELECT: "Select Control Point",
+		CAMERA_XY: "XY Camera Rotation (←→)",
+		CAMERA_Z: "YZ Camera Rotation (↑↓)",
+		ZOOM: "Zoom",
+		MOVE_X: "Move Control Point Along X Axis",
+		MOVE_Y: "Move Control Point Along Y Axis",
+		MOVE_Z: "Move Control Point Along Z Axis",
+		TUTORIAL: "TUTORIAL",
+		DISPLAY: "DISPLAY",
+		RESTORE: "RESTORE",
+		EXIT: "EXIT",
+		MORPH: "MORPH",
+		ZOOMTOFIT: "ZOOMTOFIT",
+		DOWNLOAD_SVG: "DOWNLOAD_SVG",
+		DOWNLOAD_PNG: "DOWNLOAD_PNG"
+	};
+
+	keys = { 
+		85: this.actionNames.CAMERA_XY,
+		86: this.actionNames.CAMERA_Z,
+		73: this.actionNames.SELECT,
+		87: this.actionNames.ZOOM,
+		69: this.actionNames.DISPLAY,
+		74: this.actionNames.MOVE_X,
+		75: this.actionNames.MOVE_Y,
+		76: this.actionNames.MOVE_Z,
+		66: this.actionNames.RESTORE,
+		72: this.actionNames.EXIT,
+		68: this.actionNames.TUTORIAL,
+		65: this.actionNames.MORPH,
+		88: this.actionNames.ZOOMTOFIT,
+		192: this.actionNames.DOWNLOAD_SVG,
+		189: this.actionNames.DOWNLOAD_PNG
+	};
+
+	/**
+	 * These two numbers determine camera location.
+	 * Camera is always looking at the origin with z-axis = up.
+	 * See .positionCamera()
+	 */
+	azimuth = Math.PI / 8;
+	altitude = Math.PI / 4;
+
+	preventKeysExceptTutorial = false;
 	
 	constructor() {
 
 		super();
 
-		/**
-		 * Initial state:
-		 * - no action selected (control knob does nothing)
-		 * - iteration set to 0
-		 * - coordinates not visible
-		 * - last interaction happened at this precise moment
-		 */
-		this.state = {
-			action: null,
-			i: 0,
-			coordinates: false,
-			lastInteraction: new Date(),
-			tutorial: -1, // stage of tutorial (-1 for not active),
-			lastTutorial: -1,
-			idles: 0,
-		};
-
-		this.surface = new Surface();
 		tutorialManager.cv = this;
-
-		this.actionNames = {
-			SELECT: "Select Control Point",
-			CAMERA_XY: "XY Camera Rotation (←→)",
-			CAMERA_Z: "YZ Camera Rotation (↑↓)",
-			ZOOM: "Zoom",
-			MOVE_X: "Move Control Point Along X Axis",
-			MOVE_Y: "Move Control Point Along Y Axis",
-			MOVE_Z: "Move Control Point Along Z Axis",
-			TUTORIAL: "TUTORIAL",
-			DISPLAY: "DISPLAY",
-			RESTORE: "RESTORE",
-			EXIT: "EXIT",
-			MORPH: "MORPH",
-			ZOOMTOFIT: "ZOOMTOFIT",
-			DOWNLOAD_SVG: "DOWNLOAD_SVG",
-			DOWNLOAD_PNG: "DOWNLOAD_PNG"
-		};
 
 		this.actions = {
 			[this.actionNames.SELECT]: _.throttle(this.toggle, 250),
@@ -68,43 +97,6 @@ export default class CanvasView extends Component {
 			[this.actionNames.MOVE_Y]: this.updateControlPoint.bind(this, "y"),
 			[this.actionNames.MOVE_Z]: this.updateControlPoint.bind(this, "z")
 		};
-
-		this.keys = { 
-			85: this.actionNames.CAMERA_XY,
-			86: this.actionNames.CAMERA_Z,
-			73: this.actionNames.SELECT,
-			87: this.actionNames.ZOOM,
-			69: this.actionNames.DISPLAY,
-			74: this.actionNames.MOVE_X,
-			75: this.actionNames.MOVE_Y,
-			76: this.actionNames.MOVE_Z,
-			66: this.actionNames.RESTORE,
-			72: this.actionNames.EXIT,
-			68: this.actionNames.TUTORIAL,
-			65: this.actionNames.MORPH,
-			88: this.actionNames.ZOOMTOFIT,
-			192: this.actionNames.DOWNLOAD_SVG,
-			189: this.actionNames.DOWNLOAD_PNG
-		};
-
-		/**
-		 * These two numbers determine camera location.
-		 * Camera is always looking at the origin with z-axis = up.
-		 * See .positionCamera()
-		 */
-		this.azimuth = Math.PI / 8;
-		this.altitude = Math.PI / 4;
-
-		this.preventKeysExceptTutorial = false;
-	}
-
-	/**
-	 * Method that increases iteration state.
-	 * Useful in that it triggers .render()
-	 * without any other side effects.
-	 */
-	iter = () => {
-		this.setState({ i: this.state.i + 1 });
 	}
 
 	checkLastInteraction = () => {
