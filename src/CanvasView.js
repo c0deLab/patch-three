@@ -531,7 +531,7 @@ export default class CanvasView extends Component {
 		const svgUrl = URL.createObjectURL(svgBlob);
 		const a = document.createElement('a');
 		a.href = svgUrl;
-		a.download = 'test_n.svg';
+		a.download = 'patch.svg';
 		a.click();
 	}
 
